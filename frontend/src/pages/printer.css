@@ -1,0 +1,15 @@
+@media print {
+    .nav ,.geminichatbar,.trigger,.ql-toolbar,header, footer, aside, form, … {
+        display: none;
+    }
+    .ql-container,.ql-snow{
+        border: none;
+    }
+    .ql-editor{
+        border: none;
+    }
+    .ql-container.ql-snow{
+        border: none;
+    }
+}
+
