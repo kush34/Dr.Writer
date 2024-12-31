@@ -1,8 +1,5 @@
 {
-    "routes": [
-      { "src": "/login", "dest": "/" },
-      { "src": "/login/phone-verification", "dest": "/" },
-      { "src": "/topics", "dest": "/" },
-      { "src": "/", "dest": "/" }
+    "rewrites":  [
+      {"source": "/(.*)", "destination": "/"}
     ]
-  }
+}
