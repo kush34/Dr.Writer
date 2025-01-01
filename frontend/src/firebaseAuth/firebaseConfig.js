@@ -25,12 +25,12 @@ const getFirebaseToken = async () => {
   if (user) {
     try {
       const token = await user.getIdToken(); // Get the Firebase ID token
-      console.log("Token:", token);
+      // console.log("Token:", token);
 
       // Send the token to the server
       const response = await axios
         .post(import.meta.env.VITE_Backend_URL + "/firebaseTokenVerify",{token})
-        .then(res => console.log(res))
+        // .then(res => console.log(res))
         .catch(err => console.error(err));
     } catch (error) {
       console.error("Error getting token:", error);
@@ -41,25 +41,25 @@ const getFirebaseToken = async () => {
 
 
 export const googleSignInPopUp = async ()=>{
-  signInWithPopup(auth, provider)
-  .then((result) => {
+  try {
+    const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const token = credential.accessToken;
     const user = result.user;
-    
-    //get token and send it to backend for verification
-    getFirebaseToken();
 
-  }).catch((error) => {
-    // Handle Errors here.
-    // The email of the user's account used.
-    // The AuthCredential type that was used.
+    // Get token and send it to backend for verification
+    await getFirebaseToken();
+    console.log(`User signed in`);
+    return true; // Explicitly return true when successful
+  } catch (error) {
+    // Handle Errors here
     const errorCode = error.code;
     const errorMessage = error.message;
-    const email = error.customData.email;
+    const email = error.customData?.email;
     const credential = GoogleAuthProvider.credentialFromError(error);
-    // ...
-  });
+    console.error(`Sign-in error: ${errorCode} - ${errorMessage}`);
+    return false; // Return false on error
+  }
 }
 
 export const createUser = async (email, password)=>{
