@@ -16,10 +16,11 @@ import { useContext, useState } from "react";
 import { UserContext } from "../context/UserContext";
 import { Label } from "@/components/ui/label"
 import apiClient from "@/service/axiosConfig";
-
+import { ThemeContext } from "@/context/ThemeContext";
 
 export function GeminiChatBar() {
     const { user, loading } = useContext(UserContext);
+    const {theme} = useContext(ThemeContext);
     if (loading) return <p>Loading...</p>;
     if (!user) return <p>User not logged in</p>;
     const [prompt,setPrompt] = useState('');
@@ -44,8 +45,8 @@ export function GeminiChatBar() {
         }
     }
     return (
-        <Sidebar>
-        <SidebarContent>
+        <Sidebar className={`${theme=='dark' ? "bg-zinc-900":""}`}>
+        <SidebarContent className={`${theme=='dark' ? "bg-zinc-900":""}`}>
             <SidebarGroup>
                 <SidebarGroupLabel className='text-xl font-semibold'>Dr. Writer</SidebarGroupLabel>
             </SidebarGroup>
@@ -69,23 +70,21 @@ export function GeminiChatBar() {
                 </div>
             </SidebarContent>
         </SidebarContent>
-        <SidebarFooter>
+        <SidebarFooter className={`${theme=='dark' ? "bg-zinc-900":""}`}>
             <SidebarContent>
                 <SidebarMenu>
                     <SidebarMenuItem>
                     {geminiLoading ?
-                    <div className="m-2">
-                        <Label htmlFor="m-4 Gemini Prompt">Prompt</Label>
-                        <div className="flex" >
+                        <div className={`${theme=='dark' ? "bg-zinc-900":""} flex`}>
                             <Input 
                             id="prompt"
                             type="text"
+                            className={`${theme=='dark' ? "bg-zinc-900":""}`}
                             onChange={(e)=>setPrompt(e.target.value)} 
                             value={prompt}
                             placeholder='enter your prompt Gemini' />
                             <SendHorizontal onClick={handleSend} className="text-xl cursor-pointer m-2"/>
                         </div>
-                    </div>
                     :
                     <div>
                         Loading...

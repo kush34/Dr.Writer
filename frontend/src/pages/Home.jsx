@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import Layout from './Layout';
 import { UserContextProvider } from '../context/UserContext';
 import Files  from '../components/Files';
@@ -17,10 +17,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Description } from '@radix-ui/react-dialog';
-
+import { ThemeContext } from '@/context/ThemeContext';
 
 const Home = () => {
   const { toast } = useToast();
+  const {theme} = useContext(ThemeContext)
   const [newTitle,setNewTitle] = useState();
   const hiddenFileInput = useRef(null);
   const handleAdd = async() =>{
@@ -61,52 +62,52 @@ const Home = () => {
   return (
     <UserContextProvider>
       <Layout>
-        <Files>
-        </Files>
-        <div className="actions relative flex justify-end mr-12">
-          <div>
-            {/* <Button onClick={handleAdd} className='bg-zinc-900 border-2 border-zinc-900 text-white ' variant="outline">Add</Button> */}
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className='hover:bg-zinc-900 hover:text-white' variant="outline">Add</Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Create New Document</DialogTitle>
-                  <DialogDescription>
-                     Click save when you're done.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="name" className="text-right">
-                      Title
-                    </Label>
-                    <Input
-                      id="name"
-                      defaultValue="New Document"
-                      onChange={(e)=>setNewTitle(e.target.value)}
-                      className="col-span-3"
-                    />
+          <Files>
+          </Files>
+          <div className="actions relative flex justify-end mr-12">
+            <div>
+              {/* <Button onClick={handleAdd} className='bg-zinc-900 border-2 border-zinc-900 text-white ' variant="outline">Add</Button> */}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className={`${theme=='dark' ? "bg-zinc-800 text-white":"bg-zinc-900 text-white"}`} variant="outline">Add</Button>
+                </DialogTrigger>
+                <DialogContent className={`${theme=='dark' ? "bg-zinc-800 ":""} sm:max-w-[425px]`}>
+                  <DialogHeader>
+                    <DialogTitle>Create New Document</DialogTitle>
+                    <DialogDescription>
+                      Click save when you're done.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="name" className="text-right">
+                        Title
+                      </Label>
+                      <Input
+                        id="name"
+                        defaultValue="New Document"
+                        onChange={(e)=>setNewTitle(e.target.value)}
+                        className='col-span-3 text-black'
+                      />
+                    </div>
                   </div>
-                </div>
-                <DialogFooter>
-                  <Button type="submit" onClick={handleAdd}>Create</Button>
-                  <input 
-                  type="file"
-                  className='hidden' 
-                  ref={hiddenFileInput}
-                  accept=".doc,.docx"
-                  onChange={handleFileUpload}
-                  name="" id="" />
-                  <Button type="submit" onClick={(e)=>hiddenFileInput.current.click()}>Upload</Button>
+                  <DialogFooter>
+                    <Button type="submit" onClick={handleAdd}>Create</Button>
+                    <input 
+                    type="file"
+                    className='hidden' 
+                    ref={hiddenFileInput}
+                    accept=".doc,.docx"
+                    onChange={handleFileUpload}
+                    name="" id="" />
+                    <Button type="submit" onClick={(e)=>hiddenFileInput.current.click()}>Upload</Button>
 
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
+            </div>
           </div>
-        </div>
       </Layout>
     </UserContextProvider>
   )

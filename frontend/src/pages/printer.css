@@ -1,4 +1,7 @@
 @media print {
+    *{
+        color: black;
+    }
     .nav ,.geminichatbar,.trigger,.ql-toolbar,header, footer, aside, form, … {
         display: none;
     }

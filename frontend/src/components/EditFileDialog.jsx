@@ -10,9 +10,11 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState } from "react";
+import { useContext, useState } from "react";
+import { ThemeContext } from "@/context/ThemeContext";
 
 function EditFileDialog({fileInfo,setTitle}) {
+    const {theme} = useContext(ThemeContext);
     const [fileTitle,setFileTitle] = useState(fileInfo?.title || null);
     const [newFileTitle,setNewFileTitle] = useState(fileInfo?.title || null);
     const [dialogFlag,setDialogFlag]=useState(false);
@@ -29,7 +31,7 @@ function EditFileDialog({fileInfo,setTitle}) {
       <DialogTrigger asChild>
         <Button variant="outline">Edit  </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className={`${theme=='dark' ? "bg-zinc-900":""} sm:max-w-[425px]`}>
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
           <DialogDescription>
@@ -45,7 +47,7 @@ function EditFileDialog({fileInfo,setTitle}) {
               id="name"
               defaultValue={`${fileInfo ? fileInfo.title : `file title`}`}
               onChange = {(e)=>setNewFileTitle(e.target.value)}
-              className="col-span-3"
+              className="col-span-3 text-black"
             />
           </div>
         </div>

@@ -9,7 +9,7 @@ const ThemeToggleBtn = () => {
     <button
       onClick={toggleTheme}
       aria-label="Toggle Theme"
-      className="p-2 rounded-full bg-gray-200 dark:bg-gray-800"
+      className="p-2 rounded-full "
     >
       <SunMoon className={`text-lg ${theme === "dark" ? "text-yellow-400" : "text-gray-600"}`} />
     </button>

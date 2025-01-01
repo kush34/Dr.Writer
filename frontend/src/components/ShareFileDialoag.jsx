@@ -11,12 +11,14 @@ import {
 import { UserPlus } from 'lucide-react';
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import apiClient from "@/service/axiosConfig";
 import { useParams } from "react-router-dom";
+import { ThemeContext } from "@/context/ThemeContext";
 
 function ShareFileDialog() {
+  const {theme} = useContext(ThemeContext)
     const [userToAddMail,setUserToAddMail] = useState('');
     const id = useParams();
     const [dialogFlag,setDialogFlag]=useState(false);
@@ -46,7 +48,7 @@ function ShareFileDialog() {
       <DialogTrigger asChild>
         <Button className='border-2 text-black hover:bg-black hover:text-white ' variant="outline"> <UserPlus /></Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className={`${theme=='dark' ? "bg-zinc-900":""} sm:max-w-[425px]`}>
         <DialogHeader>
           <DialogTitle>Add New User</DialogTitle>
           <DialogDescription>
@@ -61,7 +63,7 @@ function ShareFileDialog() {
             <Input
               id="name"
               onChange = {(e)=>setUserToAddMail(e.target.value)}
-              className="col-span-3"
+              className="col-span-3 text-black"
               placeholder='enter mail of user to add'
             />
           </div>

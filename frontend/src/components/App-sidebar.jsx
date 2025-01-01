@@ -5,8 +5,6 @@ import {
   Inbox,
   Search,
   Settings,
-  User2,
-  SunMoon
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -35,7 +33,7 @@ import {
 
 import { useContext, useEffect } from "react";
 import { UserContext } from "../context/UserContext";
-
+import { ThemeContext } from "@/context/ThemeContext";
 // Menu items.
 const items = [
   {
@@ -66,14 +64,15 @@ const items = [
 ];
 
 export function AppSidebar() {
+  const {theme} = useContext(ThemeContext);
   const { user, loading } = useContext(UserContext);
   if (loading) return <p>Loading...</p>;
   if (!user) return <p>User not logged in</p>;
   // console.log(user.photoURL)
 
   return (
-    <Sidebar>
-      <SidebarContent>
+    <Sidebar className={`${theme=='dark' ? "bg-zinc-900":""}`}>
+      <SidebarContent className={`${theme=='dark' ? "bg-zinc-900 text-white":""}`}>
         <SidebarGroup>
           <SidebarGroupLabel>Dr. Writer</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -93,7 +92,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       
-      <SidebarFooter>
+      <SidebarFooter className={`${theme=='dark' ? "bg-zinc-900":""}`}>
         <SidebarContent>
           <SidebarGroupContent>
             <ThemeToggleBtn/>
@@ -101,7 +100,7 @@ export function AppSidebar() {
         </SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <DropdownMenu>
+              <DropdownMenu className={`${theme=='dark' ? "bg-zinc-900":""}`}>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton>
                   <Avatar>
@@ -114,7 +113,7 @@ export function AppSidebar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   side="top"
-                  className="w-[--radix-popper-anchor-width]"
+                  className={`${theme=='dark' ? "bg-zinc-900 text-white":""} w-[--radix-popper-anchor-width]`}
                 >
                   <DropdownMenuItem>
                     <span>Account</span>
