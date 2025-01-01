@@ -11,8 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Printer } from 'lucide-react';
 import '../service/IndexDb'
 import { addDocument, updateDocumentIndexDb ,syncData} from '../service/IndexDb';
-
+import { ThemeContext } from '@/context/ThemeContext';
 const Editor = () => {
+    const {theme} = useContext(ThemeContext);
     const { user, loading, setLoading } = useContext(UserContext);
     const navigate = useNavigate();
     const quillRef = useRef(null);
@@ -134,12 +135,12 @@ const Editor = () => {
                         <ShareFileDialog className='border-2 text-black hover:bg-black hover:text-white '/>
                     </div>
                     <div className="editbtn text-sm mx-2 cursor-pointer">
-                        <Button onClick={window.print} className=' border-2  hover:bg-black hover:text-white ' variant="outline"><Printer /></Button>
+                        <Button onClick={window.print} className={`${theme ? "text-black":""} hover:bg-black hover:text-white`} variant="outline"><Printer /></Button>
                     </div>
                 </div>
                 <div className="title m-2 flex justify-end gap-3">
-                    <Button onClick={updateDocument} className='bg-zinc-900 border-2 border-zinc-900 text-white ' variant="outline">Save</Button>
-                    <Button onClick={() => navigate(`/home`)} className='bg-zinc-900 border-2 border-zinc-900 text-white ' variant="outline">Back</Button>
+                    <Button onClick={updateDocument} className={`${theme ? "text-black":""} hover:bg-black hover:text-white`} variant="outline">Save</Button>
+                    <Button onClick={() => navigate(`/home`)} className={`${theme ? "text-black":""} hover:bg-black hover:text-white`} variant="outline">Back</Button>
                 </div>
             </div>
             <ReactQuill

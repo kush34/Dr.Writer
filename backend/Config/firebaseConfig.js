@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+// import serviceAccount from './secret-file.json' assert { type: "json" };
 import serviceAccount from '../secret-file.json' with { type: "json" };
 
 admin.initializeApp({
