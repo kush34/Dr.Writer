@@ -1,12 +1,20 @@
 import React, { useState } from 'react'
 import { signIn,googleSignInPopUp } from '../firebaseAuth/firebaseConfig';
-
+import { useNavigate } from 'react-router-dom';
 const Login = () => {
   const [email,setEmail] = useState('');
   const [password,setPassword] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = ()=>{
     signIn(email,password)
+  }
+  const handleGoogleLogin = async ()=>{
+    const res = await googleSignInPopUp();
+    if(res){
+      navigate('/home');
+    }
+    return;
   }
   return (
     <div>
@@ -20,7 +28,7 @@ const Login = () => {
         <button onClick={handleSubmit} className='rounded bg-blue-700 px-4 py-1 hover:bg-blue-900'>Submit</button>
       </div>
       <div className="firebase-login-options flex justify-center items-center gap-4 m-4">
-        <button onClick={googleSignInPopUp} className='rounded  px-4 py-1 bg-green-600 hover:bg-green-700'>Google</button>
+        <button onClick={handleGoogleLogin} className='rounded  px-4 py-1 bg-green-600 hover:bg-green-700'>Google</button>
       </div>
     </div>
   )
