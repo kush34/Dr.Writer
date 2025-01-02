@@ -63,36 +63,27 @@ export const googleSignInPopUp = async ()=>{
 }
 
 export const createUser = async (email, password)=>{
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        // Signed up 
-        const user = userCredential.user;
-        // ...
-        getFirebaseToken();
-      })
-      .catch((error) => {
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        console.log(error)
-        // ..
-      });   
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    await getFirebaseToken();
+    return true;
+  } catch (error) {
+    // console.log(error)
+    return error;
+  }
 }
 
-export const signIn = async (email, password)=>{
-    signInWithEmailAndPassword(auth, email, password)
-  .then((userCredential) => {
-    // Signed in 
-    const user = userCredential.user;
-    console.log(user);
-    
-    // ...
-  })
-  .catch((error) => {
-    const errorCode = error.code;
-    const errorMessage = error.message;
-    console.log(error)
-  });
-}
+export const signIn = async (email, password) => {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    const user = result.user; // Fixed reference to the userCredential
+    await getFirebaseToken(); // Ensure this function is defined and implemented
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
 
 export const signOutUser = async () => {
   try {
