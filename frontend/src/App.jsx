@@ -13,7 +13,7 @@ const App = () => {
         <div className="Title w-1/2 h-screen flex flex-col justify-center items-center">
         <div className='flex flex-col justify-center items-end'>
           <h1 className='font-bold text-5xl'>Documents Made Easy</h1>
-          <p className='text-zinc-400'>Lorem ipsum dolor sit amet</p>
+          <p className='text-zinc-400 italic'>by Dr.Writer</p>
         </div>
         </div>
         <div className="action w-1/2 h-screen flex flex-col justify-center items-center">

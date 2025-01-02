@@ -20,8 +20,6 @@ const Register = () => {
         <button onClick={handleSubmit} className='rounded bg-blue-700 px-4 py-1 hover:bg-blue-900'>Submit</button>
       </div>
       <div className="firebase-login-options flex justify-center items-center gap-4 m-4">
-        <button className='rounded  px-4 py-1 bg-green-600 hover:bg-green-700'>Google</button>
-        <button className='rounded  px-4 py-1 bg-green-600 hover:bg-green-700'>Apple</button>
       </div>
     </div>
   )
