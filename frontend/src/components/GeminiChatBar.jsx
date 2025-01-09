@@ -17,6 +17,7 @@ import { UserContext } from "../context/UserContext";
 import { Label } from "@/components/ui/label"
 import apiClient from "@/service/axiosConfig";
 import { ThemeContext } from "@/context/ThemeContext";
+import Markdown from "react-markdown";
 
 export function GeminiChatBar() {
     const { user, loading } = useContext(UserContext);
@@ -59,10 +60,12 @@ export function GeminiChatBar() {
                     (responseList.map((promptAns,index)=>{
                         return (
                         <div className="m-2 p-2 rounded-md text-sm text-black bg-zinc-200" key={index}>
+                            <Markdown>
                             {promptAns}
+                            </Markdown>
                             {/* <div className="btn  flex justify-end ">
                                 <Plus onClick={handleAddContent} className="text-zinc-500 text-sm hover:text-zinc-900 duration-10sidebar0 hover:scale-125 ease-out"/>
-                            </div> */}
+                                </div> */}
                         </div>
                         )
                     }))
