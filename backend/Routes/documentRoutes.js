@@ -7,6 +7,16 @@ import Document from '../Models/documentModel.js'
 import fs from 'fs';
 import mammoth from 'mammoth';
 import useGemini from '../service/gemini.js'
+import rateLimit from 'express-rate-limit';
+
+const geminiLimiter = rateLimit({
+	windowMs: 5 * 60 * 1000, // 5 minutes
+	limit: 10, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message:"reached your limit... pls try again later"
+})
+
 
 //creates new document on user request
 router.post('/createDocument',firebaseTokenVerify,async (req,res)=>{
@@ -143,7 +153,7 @@ router.post("/adduser", firebaseTokenVerify, async (req, res) => {
 });
   
 //Gemini prompt route
-router.post("/userprompt",firebaseTokenVerify,async (req, res) => {
+router.post("/userprompt",geminiLimiter,firebaseTokenVerify,async (req, res) => {
     const user_id = req.user_id;
     const userPrompt = req.body.userPrompt;
     if(!userPrompt || !user_id){
