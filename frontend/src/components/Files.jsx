@@ -12,7 +12,7 @@ const Files = () => {
   const getDocList = async () => {
     try {
       if (user) { 
-        const response = await apiClient.get('/documentList');
+        const response = await apiClient.get('/document/documentList');
         // console.log(`Document list for display`);
         // console.log(response);
         setList(response.data)

@@ -34,7 +34,7 @@ export function GeminiChatBar() {
         if(prompt == '') return;
         setGeminiLoading(false);
         setPrompt('');
-        const response = await apiClient.post('/userprompt',{
+        const response = await apiClient.post('/document/userprompt',{
             userPrompt:prompt
         });
         // console.log(response);

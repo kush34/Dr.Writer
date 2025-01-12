@@ -41,7 +41,7 @@ const Editor = () => {
 
     const getContent = async () => {
         try {
-            const response = await apiClient.post('/documentData', {
+            const response = await apiClient.post('/document/documentData', {
                 file_id: id.id,
             });
             // console.log(response.data);
@@ -54,7 +54,7 @@ const Editor = () => {
 
     const updateDocument = async () => {
         try {
-            const response = await apiClient.post('/documentUpdate', {
+            const response = await apiClient.post('/document/documentUpdate', {
                 file_id: id.id,
                 title,
                 newContent: content,
