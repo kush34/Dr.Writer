@@ -69,7 +69,7 @@ export const syncData = async (id)=>{
     return true;
   } 
 
-  const response = await apiClient.post('/syncDocument',{
+  const response = await apiClient.post('/document/syncDocument',{
     file_id:documentToBeUpdated._id,
     title:documentToBeUpdated.title,
     newContent:documentToBeUpdated.newContent

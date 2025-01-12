@@ -31,7 +31,7 @@ function ShareFileDialog() {
             });
             return;
           }
-          const response = await apiClient.post('/adduser',{
+          const response = await apiClient.post('/document/adduser',{
             file_id:id.id,
             userToAddMail,
           })

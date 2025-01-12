@@ -1,6 +1,6 @@
 import admin from 'firebase-admin';
-// import serviceAccount from './secret-file.json' assert { type: "json" };
-import serviceAccount from '../secret-file.json' with { type: "json" };
+// import serviceAccount from './secret-file.json' assert { type: "json" }; //for Development
+import serviceAccount from '../secret-file.json' with { type: "json" }; //for production
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),

@@ -26,7 +26,7 @@ const Home = () => {
   const hiddenFileInput = useRef(null);
   const handleAdd = async() =>{
     try{
-      const responce  = await apiClient.post('/createDocument',{
+      const responce  = await apiClient.post('/document/createDocument',{
         title: `${newTitle}`
       });
       if(responce.status == 200){
@@ -46,7 +46,7 @@ const Home = () => {
     formData.append("file", file);
 
     try {
-        const response  = await apiClient.post('/fileUpload',
+        const response  = await apiClient.post('/document/fileUpload',
           formData, {
             headers: { "Content-Type": "multipart/form-data" }
           });
