@@ -6,10 +6,18 @@ import { Server } from "socket.io";
 import http from 'http';
 import userRoutes from './Routes/userRoutes.js';
 import documentRoutes from './Routes/documentRoutes.js';
-
+import rateLimit from 'express-rate-limit'
 //Connection to the database
 connectDB();
 const app = express();
+
+
+// Global rate limiter
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per `window` (15 minutes)
+  message: 'Too many requests, please try again later.',
+});
 
 //Socket server for connection
 const server  = http.createServer(app);
@@ -24,13 +32,17 @@ const  io = new Server(server,{
 //for CORS and form data 
 var corsOptions = {
   origin: process.env.Frontend_URL,
-  optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
+  optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 app.use(express.urlencoded({extended:true}));
+app.use(globalLimiter);
 app.use(express.json());
 app.use('/api',userRoutes);
 app.use('/api/document',documentRoutes);
+app.use((req, res, next) => {
+  res.status(404).json({ message: 'Route not found' });
+});
 
 //Socket events 
 io.on("connection",(socket)=>{
@@ -65,5 +77,5 @@ app.listen(process.env.PORT || 5000,()=>{
 })  
 
 server.listen(process.env.Socket,()=>{
-	console.log(`listening on :3000`);
+	console.log(`listening on :${process.env.Socket}`);
 })
