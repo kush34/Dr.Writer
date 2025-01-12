@@ -32,7 +32,7 @@ This project is a fully functional word document editor, designed to provide an 
  * Organize documents into folders for easy access.
 
 4. **Sharing and Permissions**
-5. 
+ 
  * Share documents via unique links.
 
  * Set view, comment, or edit permissions.
