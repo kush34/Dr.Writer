@@ -16,3 +16,6 @@
     }
 }
 
+.ql-container,.ql-snow , .ql-editor{
+    max-width: 990px;
+}
