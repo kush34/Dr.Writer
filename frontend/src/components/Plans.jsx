@@ -6,7 +6,7 @@ const Plans = () => {
         <div className='text-4xl font-medium flex justify-center'>
             Our Plans
         </div>
-        <div className='m-10 flex justify-center gap-5'>
+        <div className='m-10 flex flex-col items-center md:flex-row justify-center gap-5'>
             <div className="card w-[300px] h-[60vh] border rounded flex flex-col justify-between">
                 <div className="title font-medium p-2   ">
                     Free Plan
