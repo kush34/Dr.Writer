@@ -23,6 +23,24 @@ const Editor = () => {
     const [content, setContent] = useState('');
     const [title, setTitle] = useState(fileInfo?.title);
 
+    const modules = {
+        toolbar: [
+          [{ font: [] }], // Font family
+          [{ size: ['small', false, 'large', 'huge'] }], // Font size
+          ['bold', 'italic', 'underline'], // Bold, italic, underline
+          [{ color: [] }, { background: [] }], // Font color and background color
+          [{ align: [] }], // Text alignment
+          ['clean'], // Clear formatting
+        //   ["link", "image"],
+        ],
+    };
+
+    const formats = [
+        'font', 'size', 'bold', 'italic', 'underline',
+        'color', 'background', 'align',
+        // 'image'
+    ];
+
     const handleChange = (content, delta, source, editor) => {
         if (source === "user") {
             setContent(content);
@@ -48,7 +66,7 @@ const Editor = () => {
             setFileInfo(response.data);
             setContent(response.data.content);
         } catch (error) {
-            console.log(error);
+            // console.log(error);
         }
     };
 
@@ -148,6 +166,8 @@ const Editor = () => {
                 className='editor'
                 value={content}
                 onChange={handleChange}
+                modules={modules}
+                formats={formats}
                 ref={quillRef}
                 placeholder="Start typing..."
                 style={{ height: '80vh' }}
