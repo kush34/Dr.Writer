@@ -3,15 +3,16 @@ import { signIn,googleSignInPopUp } from '../firebaseAuth/firebaseConfig';
 import { useNavigate } from 'react-router-dom';
 import { Eye } from 'lucide-react';
 import { EyeOff } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Description } from '@radix-ui/react-dialog';
 
 const Login = () => {
   const [email,setEmail] = useState('');
   const [password,setPassword] = useState('');
   const [isLoading,setIsLoading] = useState(false);
-  const [ErrorFlag,setErrorFlag] = useState(false);
   const [passtype,setPassType] = useState(false);
   const navigate = useNavigate();
-
+  const {toast} = useToast();
   const handleSubmit = async ()=>{
     setIsLoading(true);
     const res = await signIn(email,password);
@@ -20,8 +21,10 @@ const Login = () => {
       navigate('/home');
     }
     else{
-      setErrorFlag(true);
       setIsLoading(false);
+      toast({
+        description:"Wrong credentials"
+      })
     }
   }
   const handleGoogleLogin = async ()=>{
@@ -57,12 +60,6 @@ const Login = () => {
               />
           }
         </div>
-        {
-          ErrorFlag &&
-          <div className='text-white rounded font-semibold border-2 border-red-800 p-1'>
-            Error : Pls enter correct details
-          </div>
-        }
         {
           isLoading ?
           <div>Loading...</div>

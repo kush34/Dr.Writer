@@ -1,12 +1,24 @@
 import React,{useState} from 'react'
 import { createUser } from '../firebaseAuth/firebaseConfig';
+import { Description } from '@radix-ui/react-toast';
+import { useToast } from '@/hooks/use-toast';
 const Register = () => {
   const [email,setEmail] = useState('');
   const [password,setPassword] = useState('');
-
-  const handleSubmit = ()=>{
+  const {toast} = useToast();
+  const handleSubmit =async ()=>{
     console.log(email,password);
-    createUser(email,password);
+    const result =await createUser(email,password);
+    console.log(result)
+    if(!result){
+      toast({
+        description:"pls enter valid inputs and strong password"
+      })
+    }else{
+      toast({
+        description:"user registered successfully"
+      })
+    }
   }
   return (
     <div>
