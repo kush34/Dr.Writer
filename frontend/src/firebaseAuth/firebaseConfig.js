@@ -70,7 +70,7 @@ export const createUser = async (email, password)=>{
     return true;
   } catch (error) {
     // console.log(error)
-    return error;
+    return false;
   }
 }
 

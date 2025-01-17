@@ -1,5 +1,6 @@
 import express from 'express';
-
+import admin from 'firebase-admin';
+import User from '../Models/userModel.js'
 const router = express.Router();
 
 router.get("/", (req, res) => {

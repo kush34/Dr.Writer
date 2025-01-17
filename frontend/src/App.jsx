@@ -1,14 +1,19 @@
 import React,{useState,useEffect} from 'react'
 import Login from './components/Login'
 import Register from './components/Register'
+import AppLayout from './AppLayout'
+import { toast, useToast } from './hooks/use-toast'
 
 const App = () => {
+  const { toast } = useToast();
   const [flag,setFlag] = useState(true)
   const handleFlip = ()=>{
     setFlag(value=>!value)
   }
+
   return (
-    <div className='bg-zinc-900 w-full h-screen text-white'>
+    <AppLayout>
+    <div className='bg-black w-full h-screen text-white'>
       <div className="main flex">
         <div className="Title w-1/2 h-screen flex flex-col justify-center items-center">
         <div className='flex flex-col justify-center items-end'>
@@ -24,6 +29,8 @@ const App = () => {
         </div>
       </div>
       </div>
+    </AppLayout>
+
   )
 }
 
