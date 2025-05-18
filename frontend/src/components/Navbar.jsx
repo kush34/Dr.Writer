@@ -27,8 +27,8 @@ const Navbar = () => {
         return () => window.removeEventListener("resize", handleResize);
       }, []);
   return (
-    <div className='flex justify-between'>
-        <div className='text-4xl font-bold mx-10 my-4'>
+    <div className='w-full flex justify-between border  backdrop-filter backdrop-blur-lg m-2 rounded-xl'>
+        <div className='text-4xl text-green-500 font-bold mx-10 my-4 italic'>
             Dr.Writer
         </div>
         <div className='flex flex-col justify-center items-center'>
@@ -37,9 +37,9 @@ const Navbar = () => {
             </div>
             <div className={`mx-10 my-4`}>
                 <ul className={`flex flex-col md:flex-row items-center justify-center gap-5 ${isOpen ? "hidden":"block"}`}>
-                    <li className='hover:text-zinc-300 cursor-pointer hover:duration-300'>Features</li>
-                    <li className='hover:text-zinc-300 cursor-pointer hover:duration-300'>Blog</li>
-                    <li className='hover:text-zinc-300 cursor-pointer hover:duration-300'>Pricing</li>
+                    <li className='hover:text-zinc-300 cursor-pointer hover:duration-110 ease-in'>Features</li>
+                    <li className='hover:text-zinc-300 cursor-pointer hover:duration-110 ease-in hover:scale-125'>Blog</li>
+                    <li className='hover:text-zinc-300 cursor-pointer hover:duration-110 ease-in hover:scale-125'>Pricing</li>
                     <li onClick={()=>navigate("/login")} className='hover:text-zinc-300 cursor-pointer hover:duration-300'>Login</li>
                 </ul>
             </div>
