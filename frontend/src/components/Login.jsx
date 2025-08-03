@@ -15,23 +15,40 @@ const Login = () => {
   const {toast} = useToast();
   const handleSubmit = async ()=>{
     setIsLoading(true);
-    const res = await signIn(email,password);
-    console.log(res)
-    if(res){
-      navigate('/home');
-    }
-    else{
-      setIsLoading(false);
+    try {
+      const res = await signIn(email,password);
+      // console.log(res)
+      if(res){
+        navigate('/home');
+      }
+      else{
+        // setIsLoading(false);
+        toast({
+          description:"Wrong credentials"
+        })
+      }
+      
+    } catch (error) {
       toast({
         description:"Wrong credentials"
       })
+      
+    }finally{
+      setIsLoading(false);
     }
   }
   const handleGoogleLogin = async ()=>{
     setIsLoading(true);
-    const res = await googleSignInPopUp();
-    if(res){
-      navigate('/home');
+    try {
+      const res = await googleSignInPopUp();
+      if(res){
+        navigate('/home');
+      }
+      
+    } catch (error) {
+        toast({
+          description:"Wrong credentials"
+        })
     }
     setIsLoading(false);
     return;
