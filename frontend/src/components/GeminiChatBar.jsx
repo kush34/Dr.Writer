@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import apiClient from "@/service/axiosConfig";
 import { ThemeContext } from "@/context/ThemeContext";
 import Markdown from "react-markdown";
+import { toast } from "@/hooks/use-toast";
 
 export function GeminiChatBar() {
     const { user, loading } = useContext(UserContext);
@@ -42,7 +43,7 @@ export function GeminiChatBar() {
             setResponseList([...responseList,response.data])
             setGeminiLoading(true);
         }else{
-
+            toast("Could not send your prompt");
         }
     }
     return (
@@ -85,7 +86,13 @@ export function GeminiChatBar() {
                             className={`${theme=='dark' ? "bg-zinc-900":""}`}
                             onChange={(e)=>setPrompt(e.target.value)} 
                             value={prompt}
-                            placeholder='enter your prompt Gemini' />
+                            placeholder='enter your prompt Gemini' 
+                            onKeyDown={(e)=>{
+                                if(e.key === 'Enter'){
+                                    handleSend();
+                                }
+                            }}
+                            />
                             <SendHorizontal onClick={handleSend} className="text-xl cursor-pointer m-2"/>
                         </div>
                     :

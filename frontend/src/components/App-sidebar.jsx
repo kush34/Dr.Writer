@@ -34,6 +34,7 @@ import {
 import { useContext, useEffect } from "react";
 import { UserContext } from "../context/UserContext";
 import { ThemeContext } from "@/context/ThemeContext";
+import { Router, useNavigate } from "react-router-dom";
 // Menu items.
 const items = [
   {
@@ -41,21 +42,21 @@ const items = [
     url: "#",
     icon: Home,
   },
-  {
-    title: "Inbox",
-    url: "#",
-    icon: Inbox,
-  },
-  {
-    title: "Calendar",
-    url: "#",
-    icon: Calendar,
-  },
-  {
-    title: "Search",
-    url: "#",
-    icon: Search,
-  },
+  // {
+  //   title: "Inbox",
+  //   url: "#",
+  //   icon: Inbox,
+  // },
+  // {
+  //   title: "Calendar",
+  //   url: "#",
+  //   icon: Calendar,
+  // },
+  // {
+  //   title: "Search",
+  //   url: "#",
+  //   icon: Search,
+  // },
   {
     title: "Settings",
     url: "#",
@@ -66,10 +67,18 @@ const items = [
 export function AppSidebar() {
   const {theme} = useContext(ThemeContext);
   const { user, loading } = useContext(UserContext);
+  const navigate = useNavigate();
   if (loading) return <p>Loading...</p>;
   if (!user) return <p>User not logged in</p>;
   // console.log(user.photoURL)
-
+  const handleSignOut = async ()=>{
+    try {
+      await signOutUser();
+      navigate('/login')
+    } catch (error) {
+      
+    }
+  }
   return (
     <Sidebar className={`${theme=='dark' ? "bg-zinc-900":""}`}>
       <SidebarContent className={`${theme=='dark' ? "bg-zinc-900 text-white":""}`}>
@@ -122,7 +131,7 @@ export function AppSidebar() {
                     <span>Billing</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <span onClick={signOutUser}>Sign out</span>
+                    <span onClick={()=>handleSignOut()}>Sign out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
