@@ -3,13 +3,15 @@ import FileCard from './FileCard';
 import apiClient from '@/service/axiosConfig';
 import { useContext } from "react";
 import { UserContext } from "../context/UserContext";
+import Loader from './loaders/loader';
 
 
 const Files = () => {
   const [list, setList] = useState([]);
   const { user, loading } = useContext(UserContext);
-
+  const [isLoading,setIsLoading] = useState(false);
   const getDocList = async () => {
+    setIsLoading(true);
     try {
       if (user) { 
         const response = await apiClient.get('/document/documentList');
@@ -21,6 +23,8 @@ const Files = () => {
       }
     } catch (error) {
       console.error("Error fetching document list:", error);
+    }finally{
+      setIsLoading(false);
     }
   };
 
@@ -30,11 +34,20 @@ const Files = () => {
     }
   }, [user]); // Only re-run the effect when the 'user' changes
 
-  if (loading) return <p>Loading...</p>;
+  // if (loading) return <p>Loading...</p>;
   if (!user) return <p>User not logged in</p>;
 
   return (
     <div className='p-4'>
+      {
+        isLoading ? 
+        (
+          <div className='flex justify-center items-center w-full h-screen'>
+            <Loader/>
+          </div>
+        )
+        :
+        (
       <div className='h-[80vh] flex flex-col justify-between'>
         <div className="card-list flex flex-wrap gap-5">
           {list.length>0 ? (list.map((file,index)=>{
@@ -54,6 +67,8 @@ const Files = () => {
           Files : {list.length}
         </div>
       </div>
+        )
+      }
     </div>
   )
 }

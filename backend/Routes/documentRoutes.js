@@ -17,7 +17,19 @@ const geminiLimiter = rateLimit({
   message:"reached your limit... pls try again later"
 })
 
-
+router.get("/getDoc",async (req,res)=>{
+  try {
+    const docDb = await Document.findOne({_id:process.env.testFile});
+    if(!docDb){
+      res.status(404).send({message:"Document not found!"});
+      return
+    }
+    res.status(200).send({message:"success",document:docDb});
+  } catch (error) {
+    console.log(error)
+    res.status(500).send({message:"Something went wrong"});
+  }
+})
 //creates new document on user request
 router.post('/createDocument',firebaseTokenVerify,async (req,res)=>{
     try{

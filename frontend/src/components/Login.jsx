@@ -56,7 +56,7 @@ const Login = () => {
   return (
     <div>
       <div className="title flex flex-col items-center">
-        <h1 className='text-2xl font-semibold'>Login</h1>
+        <h1 className='text-sm xl:text-2xl font-semibold'>Login</h1>
         <p className='text-sm text-zinc-600'>enter your credentials</p>
       </div>
       <div className="form m-4 text-sm flex flex-col items-center gap-4">
