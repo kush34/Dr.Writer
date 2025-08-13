@@ -9,8 +9,10 @@ import {
     SidebarMenuItem,
     SidebarFooter,
 } from "@/components/ui/sidebar";
+import { useRef } from "react";
 import { SendHorizontal } from 'lucide-react';
 import { Input } from "@/components/ui/input";
+import React from "react";
 import { Plus } from 'lucide-react';
 import { useContext, useState } from "react";
 import { UserContext } from "../context/UserContext";
@@ -26,24 +28,31 @@ export function GeminiChatBar() {
     if (loading) return <p>Loading...</p>;
     if (!user) return <p>User not logged in</p>;
     const [prompt,setPrompt] = useState('');
-    const [geminiLoading,setGeminiLoading] = useState(true);
+    const [geminiLoading,setGeminiLoading] = useState(false);
     const [responseList,setResponseList] = useState([]);
-    // const handleAddContent = ()=>{
-        
-    // }
+
+
     const handleSend = async ()=>{
+        
         if(prompt == '') return;
-        setGeminiLoading(false);
+        setGeminiLoading(true);
         setPrompt('');
-        const response = await apiClient.post('/document/userprompt',{
-            userPrompt:prompt
-        });
-        // console.log(response);
-        if(response.status == 200){
-            setResponseList([...responseList,response.data])
-            setGeminiLoading(true);
-        }else{
-            toast("Could not send your prompt");
+        try {
+            const response = await apiClient.post('/document/userprompt',{
+                userPrompt:prompt
+            });
+            // console.log(response);
+            if (response.status === 200) {
+                setResponseList([...responseList, prompt, response.data.rawText]);
+            }else{
+                toast("Could not send your prompt");
+            }
+            
+        } catch (error) {
+            toast("Something went wrong");
+            
+        }finally{
+            setGeminiLoading(false);
         }
     }
     return (
@@ -54,32 +63,35 @@ export function GeminiChatBar() {
             </SidebarGroup>
             <SidebarContent>
                 <div className="overflow-y-scroll no-scrollbar">
-                    {responseList.length<=0 ? 
-                        <div className='px-4 text-zinc-500'>Enter prompt for Gemini response</div>
-                        
-                    :
-                    (responseList.map((promptAns,index)=>{
-                        return (
-                        <div className="m-2 p-2 rounded-md text-sm text-black bg-zinc-200" key={index}>
-                            <Markdown>
-                            {promptAns}
-                            </Markdown>
-                            {/* <div className="btn  flex justify-end ">
-                                <Plus onClick={handleAddContent} className="text-zinc-500 text-sm hover:text-zinc-900 duration-10sidebar0 hover:scale-125 ease-out"/>
-                                </div> */}
+                    {responseList.length <= 0 ? (
+                        <div className="px-4 text-zinc-500">
+                        Enter prompt for Gemini response
+                    </div>
+                    ) : (
+                        responseList.map((item, index) => (
+                            <div key={index} className="space-y-2 m-2">
+
+                        {/* Gemini message */}
+                        <div className="p-2 rounded-md text-sm bg-zinc-200 text-black">
+                            <Markdown>{item}</Markdown>
                         </div>
-                        )
-                    }))
-                    }
+                        </div>
+                    ))
+                    )}
                 </div>
             </SidebarContent>
+
         </SidebarContent>
         <SidebarFooter className={`${theme=='dark' ? "bg-zinc-900":""}`}>
             <SidebarContent>
                 <SidebarMenu>
                     <SidebarMenuItem>
                     {geminiLoading ?
-                        <div className={`${theme=='dark' ? "bg-zinc-900":""} flex`}>
+                    <div>
+                        Loading...
+                    </div>
+                    :
+                    <div className={`${theme=='dark' ? "bg-zinc-900":""} flex`}>
                             <Input 
                             id="prompt"
                             type="text"
@@ -95,10 +107,7 @@ export function GeminiChatBar() {
                             />
                             <SendHorizontal onClick={handleSend} className="text-xl cursor-pointer m-2"/>
                         </div>
-                    :
-                    <div>
-                        Loading...
-                    </div>
+                    
                     }
                     </SidebarMenuItem>
                 </SidebarMenu>

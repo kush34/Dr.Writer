@@ -166,15 +166,21 @@ router.post("/adduser", firebaseTokenVerify, async (req, res) => {
   
 //Gemini prompt route
 router.post("/userprompt",geminiLimiter,firebaseTokenVerify,async (req, res) => {
+  try {
     const user_id = req.user_id;
     const userPrompt = req.body.userPrompt;
     if(!userPrompt || !user_id){
       res.status(404).send('not prompt found pls try again...')
     }
     const response = await useGemini(userPrompt);
-    if(response){
-      res.status(200).send(response);
+    if(!response){
+      res.status(400).send({error:"could not send response"});
     }
+    res.send(response)
+  } catch (error) {
+    res.status(500).send({error:"Something went wrong"})
+    console.log(error);
+  }
 });
   
 //sync the offline file changes made by user 
