@@ -3,6 +3,7 @@ import Login from './components/Login'
 import Register from './components/Register'
 import AppLayout from './AppLayout'
 import { toast, useToast } from './hooks/use-toast'
+import { Analytics } from "@vercel/analytics/react"
 
 const App = () => {
   const { toast } = useToast();
@@ -13,6 +14,7 @@ const App = () => {
 
   return (
     <AppLayout>
+      <Analytics/>
     <div className='bg-black w-full h-screen text-white'>
       <div className="main flex">
         <div className="Title w-1/2 h-screen flex flex-col justify-center items-center">
