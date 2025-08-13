@@ -8,7 +8,7 @@ const Layout = ({ children }) => {
   const { theme } = useContext(ThemeContext);
 
   return (
-    <div className={`flex ${theme=='dark'?"bg-zinc-900":""}`}>
+    <div className={`flex ${theme=='dark'?"bg-zinc-900":"bg-zinc-100"}`}>
       <SidebarProvider>
         <GeminiChatBar className='geminichatbar'/>
             <main className="flex-1 p-4">
