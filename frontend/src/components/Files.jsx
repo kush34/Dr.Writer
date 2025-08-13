@@ -3,7 +3,9 @@ import FileCard from './FileCard';
 import apiClient from '@/service/axiosConfig';
 import { useContext } from "react";
 import { UserContext } from "../context/UserContext";
-import Loader from './loaders/Loader.jsx';
+import Loader from '@/components/loaders/Loader.jsx';
+
+
 
 
 const Files = () => {
