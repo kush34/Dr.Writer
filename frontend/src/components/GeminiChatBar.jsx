@@ -95,7 +95,7 @@ export function GeminiChatBar() {
                             <Input 
                             id="prompt"
                             type="text"
-                            className={`${theme=='dark' ? "bg-zinc-900":""}`}
+                            className={`${theme=='dark' ? "bg-zinc-900":""} outline-none`}
                             onChange={(e)=>setPrompt(e.target.value)} 
                             value={prompt}
                             placeholder='enter your prompt Gemini' 

@@ -12,14 +12,12 @@ connectDB();
 const app = express();
 
 
-// Global rate limiter
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window` (15 minutes)
+  windowMs: 15 * 60 * 1000,
+  max: 100, 
   message: 'Too many requests, please try again later.',
 });
 
-//Socket server for connection
 const server  = http.createServer(app);
 const  io = new Server(server,{
     cors: {
@@ -29,7 +27,6 @@ const  io = new Server(server,{
 });
 
 
-//for CORS and form data 
 var corsOptions = {
   origin: process.env.Frontend_URL,
   optionsSuccessStatus: 200
