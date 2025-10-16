@@ -10,10 +10,10 @@ import useGemini from '../service/gemini.js'
 import rateLimit from 'express-rate-limit';
 
 const geminiLimiter = rateLimit({
-	windowMs: 5 * 60 * 1000, // 5 minutes
-	limit: 10, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
-	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+	windowMs: 5 * 60 * 1000,
+	limit: 10, 
+	standardHeaders: true, 
+	legacyHeaders: false, 
   message:"reached your limit... pls try again later"
 })
 
@@ -74,15 +74,13 @@ router.get('/documentList',firebaseTokenVerify,async (req,res)=>{
 //get the document data for editor page
 router.post("/documentData", firebaseTokenVerify, async (req, res) => {
     try {
-      const user_id = req.user_id; // Extract user ID from token
-      const file_id = req.body.file_id; // Extract file ID from request body
+      const user_id = req.user_id; 
+      const file_id = req.body.file_id; 
   
-      // Check if user_id and file_id are provided
       if (!user_id || !file_id) {
         return res.status(400).send("Missing required parameters: user_id or file_id");
       }
   
-      // Find the document by file_id
       const document = await Document.findOne({ _id: file_id });
       console.log(`user_id:${user_id}, document user_id:${document.user_id}`)
       // If document is not found, return a 404 response
@@ -90,14 +88,12 @@ router.post("/documentData", firebaseTokenVerify, async (req, res) => {
         return res.status(404).send("Document not found");
       }
   
-      // Check if the user is authorized to access the document
       if (document.user_id.toString() === user_id.toString()) {
-        return res.status(200).send(document); // Send the document if user is authorized
+        return res.status(200).send(document); 
       }
       if(document.users.includes(user_id.toString())){
-        return res.status(200).send(document); // Send the document if user is authorized
+        return res.status(200).send(document); 
       }
-      // If user is not authorized, send a 403 response
       return res.status(403).send("You are not authorized to access this document");
     } catch (error) {
       console.error("Error fetching document data:", error);
