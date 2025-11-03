@@ -16,14 +16,14 @@ const App = () => {
     <AppLayout>
       <Analytics/>
     <div className='bg-black w-full h-screen text-white'>
-      <div className="main flex">
-        <div className="Title w-1/2 h-screen flex flex-col justify-center items-center">
+      <div className="main md:flex">
+        <div className="hidden Title w-1/2 h-screen md:flex flex-col justify-center items-center">
         <div className='flex flex-col justify-center items-end'>
           <h1 className='font-bold text-5xl'>Documents Made Easy</h1>
           <p className='text-zinc-400 italic'>by Dr.Writer</p>
         </div>
         </div>
-        <div className="action w-1/2 h-screen flex flex-col justify-center items-center">
+        <div className="action mt-24 md:mt-0 md:w-1/2 md:h-screen flex flex-col justify-center items-center">
            {flag ? <Login/> : <Register/>}
            <div>
               <button onClick={handleFlip}>{flag ? "New Here":"Already User"}</button>
