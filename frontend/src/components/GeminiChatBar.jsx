@@ -69,27 +69,29 @@ export function GeminiChatBar({ documentId }) {
         fetchChats();
     }, [])
     return (
-        <Sidebar className={`${theme == 'dark' ? "bg-zinc-900" : ""}`}>
-            <SidebarContent className={`${theme == 'dark' ? "bg-zinc-900" : ""}`}>
+        <Sidebar className={`${theme == 'dark' ? "bg-zinc-950" : ""} `}>
+            <SidebarContent className={`${theme == 'dark' ? "bg-zinc-950" : ""}`}>
                 <SidebarGroup>
                     <SidebarGroupLabel className='text-xl font-semibold'>Dr. Writer</SidebarGroupLabel>
                 </SidebarGroup>
                 <SidebarContent>
-                    <div className="overflow-y-scroll no-scrollbar">
+                    <div className="overflow-y-scroll no-scrollbar p-1">
                         {responseList.length <= 0 ? (
                             <div className="px-4 text-zinc-500">
                                 Enter prompt for Gemini response
                             </div>
                         ) : (
                             responseList.map((item, index) => (
-                                <div key={index} className="space-y-2 m-2">
-
-                                    {/* Gemini message */}
-                                    <div className="flex flex-col gap-2 p-2 rounded-md text-sm bg-zinc-400 text-black">
-                                        <Markdown>{item.prompt}</Markdown>
+                                <div className="flex flex-col gap-3 w-full">
+                                    <div className="flex justify-start">
+                                        <div className="bg-zinc-200 text-black rounded-md text-sm p-3 max-w-[80%]">
+                                            <Markdown>{item.prompt}</Markdown>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col gap-2 p-2 rounded-md text-sm bg-zinc-200 text-black">
-                                        <Markdown>{item.response}</Markdown>
+                                    <div className="flex justify-end">
+                                        <div className="bg-green-400 text-black rounded-md text-sm p-3 max-w-[80%]">
+                                            <Markdown>{item.response}</Markdown>
+                                        </div>
                                     </div>
                                 </div>
                             ))
@@ -98,7 +100,7 @@ export function GeminiChatBar({ documentId }) {
                 </SidebarContent>
 
             </SidebarContent>
-            <SidebarFooter className={`${theme == 'dark' ? "bg-zinc-900" : ""}`}>
+            <SidebarFooter className={`${theme == 'dark' ? "bg-zinc-950" : ""}`}>
                 <SidebarContent>
                     <SidebarMenu>
                         <SidebarMenuItem>
@@ -107,11 +109,11 @@ export function GeminiChatBar({ documentId }) {
                                     Loading...
                                 </div>
                                 :
-                                <div className={`${theme == 'dark' ? "bg-zinc-900" : ""} flex`}>
+                                <div className={`${theme == 'dark' ? "bg-zinc-950" : ""} flex`}>
                                     <Input
                                         id="prompt"
                                         type="text"
-                                        className={`${theme == 'dark' ? "bg-zinc-900" : ""} outline-none`}
+                                        className={`${theme == 'dark' ? "bg-zinc-950" : ""} outline-none`}
                                         onChange={(e) => setPrompt(e.target.value)}
                                         value={prompt}
                                         placeholder='enter your prompt Gemini'

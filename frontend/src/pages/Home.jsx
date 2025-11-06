@@ -69,7 +69,7 @@ const Home = () => {
               {/* <Button onClick={handleAdd} className='bg-zinc-900 border-2 border-zinc-900 text-white ' variant="outline">Add</Button> */}
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button className={`${theme=='dark' ? "bg-zinc-800 text-white":"bg-zinc-900 text-white"}`} variant="outline">Add</Button>
+                  <Button className={`bg-green-400`}>Add</Button>
                 </DialogTrigger>
                 <DialogContent className={`${theme=='dark' ? "bg-zinc-800 ":""} sm:max-w-[425px]`}>
                   <DialogHeader>
