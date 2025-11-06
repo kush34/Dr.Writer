@@ -10,10 +10,10 @@ import socket from '@/service/socket'; // Import the shared socket instance
 import { useToast } from "@/hooks/use-toast";
 import { Printer } from 'lucide-react';
 import '../service/IndexDb'
-import { addDocument, updateDocumentIndexDb ,syncData} from '../service/IndexDb';
+import { addDocument, updateDocumentIndexDb, syncData } from '../service/IndexDb';
 import { ThemeContext } from '@/context/ThemeContext';
 const Editor = () => {
-    const {theme} = useContext(ThemeContext);
+    const { theme } = useContext(ThemeContext);
     const { user, loading, setLoading } = useContext(UserContext);
     const navigate = useNavigate();
     const quillRef = useRef(null);
@@ -36,10 +36,17 @@ const Editor = () => {
     };
 
     const formats = [
-        'font', 'size', 'bold', 'italic', 'underline',
-        'color', 'background', 'align',
-        // 'image'
+        'font', 'size', 'header',
+        'bold', 'italic', 'underline', 'strike',
+        'blockquote', 'code-block',
+        'list', 'bullet',
+        'script', 'indent', 'direction',
+        'align',
+        'color', 'background',
+        'link', 'image', 'video', 'formula',
+        'clean'
     ];
+
 
     const handleChange = (content, delta, source, editor) => {
         if (source === "user") {
@@ -88,7 +95,7 @@ const Editor = () => {
             try {
                 await addDocument({
                     _id: id.id,
-                    title:fileInfo?.title,
+                    title: fileInfo?.title,
                     newContent: content,
                 });
                 toast({
@@ -99,21 +106,19 @@ const Editor = () => {
             }
         }
     };
-    
-    //gets file content
+
     useEffect(() => {
         const fetchData = async () => {
-            const syncSuccess = await syncData(id.id); // Ensure syncData finishes first
+            const syncSuccess = await syncData(id.id);
             if (syncSuccess) {
-                await getContent(); // Fetch content only after syncData completes successfully
+                await getContent();
             } else {
                 console.error("Sync failed. Fetching content skipped.");
             }
         };
-    
-        fetchData(); // Call the async function
+
+        fetchData();
     }, [user]);
-    //socket events
     useEffect(() => {
         socket.emit('enter', user?.email, id.id);
 
@@ -131,7 +136,6 @@ const Editor = () => {
         });
 
         return () => {
-            // Clean up event listeners to avoid duplicate responses
             socket.off('enter');
             socket.off('text-changes');
             socket.off('test');
@@ -140,7 +144,7 @@ const Editor = () => {
     if (loading) return <p>Loading...</p>;
     if (!user) return <p>User not logged in</p>;
     return (
-        <div> 
+        <div>
             <div className='nav flex justify-between'>
                 <div className='title flex font-semibold text-xl'>
                     <div className='my-2'>
@@ -150,15 +154,15 @@ const Editor = () => {
                         <EditFileDialog fileInfo={fileInfo} setTitle={setTitle} />
                     </div>
                     <div className="editbtn text-sm cursor-pointer">
-                        <ShareFileDialog className='border-2 text-black hover:bg-black hover:text-white '/>
+                        <ShareFileDialog className='border-2 text-black hover:bg-black hover:text-white ' />
                     </div>
                     <div className="editbtn text-sm mx-2 cursor-pointer">
-                        <Button onClick={window.print} className={`${theme ? "text-black":""} hover:bg-black hover:text-white`} variant="outline"><Printer /></Button>
+                        <Button onClick={window.print} className={`${theme ? "text-black" : ""} hover:bg-black hover:text-white`} variant="outline"><Printer /></Button>
                     </div>
                 </div>
                 <div className="title m-2 flex justify-end gap-3">
-                    <Button onClick={updateDocument} className={`${theme ? "text-black":""} hover:bg-black hover:text-white`} variant="outline">Save</Button>
-                    <Button onClick={() => navigate(`/home`)} className={`${theme ? "text-black":""} hover:bg-black hover:text-white`} variant="outline">Back</Button>
+                    <Button onClick={updateDocument} className={`${theme ? "text-black" : ""} hover:bg-black hover:text-white`} variant="outline">Save</Button>
+                    <Button onClick={() => navigate(`/home`)} className={`${theme ? "text-black" : ""} hover:bg-black hover:text-white`} variant="outline">Back</Button>
                 </div>
             </div>
             <ReactQuill

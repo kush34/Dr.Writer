@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuPortal,
 } from "@radix-ui/react-dropdown-menu";
 
 import ThemeToggleBtn from './ThemeToggleBtn'
@@ -65,23 +66,23 @@ const items = [
 ];
 
 export function AppSidebar() {
-  const {theme} = useContext(ThemeContext);
+  const { theme } = useContext(ThemeContext);
   const { user, loading } = useContext(UserContext);
   const navigate = useNavigate();
   if (loading) return <p>Loading...</p>;
   if (!user) return <p>User not logged in</p>;
   // console.log(user.photoURL)
-  const handleSignOut = async ()=>{
+  const handleSignOut = async () => {
     try {
       await signOutUser();
       navigate('/login')
     } catch (error) {
-      
+
     }
   }
   return (
-    <Sidebar className={`${theme=='dark' ? "bg-zinc-900":""}`}>
-      <SidebarContent className={`${theme=='dark' ? "bg-zinc-900 text-white":""}`}>
+    <Sidebar className={`${theme === 'dark' ? "bg-zinc-950" : ""} !border-none`}>
+      <SidebarContent className={`${theme === 'dark' ? "bg-zinc-950 text-white" : ""} !border-none`}>
         <SidebarGroup>
           <SidebarGroupLabel>Dr. Writer</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -100,29 +101,38 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      
-      <SidebarFooter className={`${theme=='dark' ? "bg-zinc-900":""}`}>
-        <SidebarContent>
-          <SidebarGroupContent>
-            <ThemeToggleBtn/>
+
+      <SidebarFooter className={`${theme === "dark" ? "bg-zinc-950" : ""} !border-none overflow-visible`}>
+        <SidebarContent className="!p-2 !bg-transparent">
+          <SidebarGroupContent className="p-0">
+            <ThemeToggleBtn />
           </SidebarGroupContent>
         </SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <DropdownMenu className={`${theme=='dark' ? "bg-zinc-900":""}`}>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton>
-                  <Avatar>
-                    <AvatarImage src={user.photoURL || "https://github.com/shadcn.png"} />
-                    <AvatarFallback>CN</AvatarFallback>
+
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton className="w-full flex items-center gap-3 px-2 py-2">
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage
+                      src={user.photoURL || "https://github.com/shadcn.png"}
+                      className="w-8 h-8 object-cover rounded-full"
+                    />
+                    <AvatarFallback className="w-8 h-8">CN</AvatarFallback>
                   </Avatar>
-                  {user.email}
-                    <ChevronUp className="ml-auto" />
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
+
+                  <span className="truncate">{user.email}</span>
+                  <ChevronUp className="ml-auto" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuPortal>
                 <DropdownMenuContent
                   side="top"
-                  className={`${theme=='dark' ? "bg-zinc-900 text-white":""} w-[--radix-popper-anchor-width]`}
+                  align="end"
+                  sideOffset={8}
+                  className={`${theme === "dark" ? "bg-zinc-950 text-white" : "bg-white text-black"} z-50 rounded-md shadow-lg w-56`}
                 >
                   <DropdownMenuItem>
                     <span>Account</span>
@@ -131,12 +141,13 @@ export function AppSidebar() {
                     <span>Billing</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <span onClick={()=>handleSignOut()}>Sign out</span>
+                    <span onClick={() => handleSignOut()}>Sign out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
+              </DropdownMenuPortal>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );
