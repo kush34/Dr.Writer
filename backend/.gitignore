@@ -1,3 +1,4 @@
 .env
 /Config/secret-file.json
+secret-file.json
 /node_modules
