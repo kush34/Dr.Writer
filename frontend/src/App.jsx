@@ -1,4 +1,4 @@
-import React,{useState,useEffect} from 'react'
+import React, { useState, useEffect } from 'react'
 import Login from './components/Login'
 import Register from './components/Register'
 import AppLayout from './AppLayout'
@@ -7,29 +7,30 @@ import { Analytics } from "@vercel/analytics/react"
 
 const App = () => {
   const { toast } = useToast();
-  const [flag,setFlag] = useState(true)
-  const handleFlip = ()=>{
-    setFlag(value=>!value)
+  const [flag, setFlag] = useState(true)
+  const handleFlip = () => {
+    setFlag(value => !value)
   }
 
   return (
     <AppLayout>
-      <Analytics/>
-    <div className='bg-black w-full h-screen text-white'>
-      <div className="main md:flex">
-        <div className="hidden Title w-1/2 h-screen md:flex flex-col justify-center items-center">
-        <div className='flex flex-col justify-center items-end'>
-          <h1 className='font-bold text-5xl'>Documents Made Easy</h1>
-          <p className='text-zinc-400 italic'>by Dr.Writer</p>
+      <Analytics />
+      <div className='flex w-full h-screen'>
+        <div className='hidden xl:inline xl:w-1/2 h-full bg-[#e6fdec]'>
+          <div className='w-full h-full flex flex-col justify-center items-center'>
+            <img src="./login.svg" alt="login Illstration" className='w-1/2 h-1/2' />
+            <span className='text-4xl font-medium'>Edit Any Documents</span>
+            <span className='text-sm font-light mt-5'>One Stop Solution for any document you need to edit absolutely free of cost *</span>
+          </div>
         </div>
+        <div className='w-full xl:w-1/2 h-full'>
+          {
+            flag ?
+              <Login setFlag={setFlag} />
+              :
+              <Register setFlag={setFlag} />
+          }
         </div>
-        <div className="action mt-24 md:mt-0 md:w-1/2 md:h-screen flex flex-col justify-center items-center">
-           {flag ? <Login/> : <Register/>}
-           <div>
-              <button onClick={handleFlip}>{flag ? "New Here":"Already User"}</button>
-           </div>
-        </div>
-      </div>
       </div>
     </AppLayout>
 
