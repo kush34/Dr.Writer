@@ -1,9 +1,12 @@
-import React from 'react'
+import React from 'react';
 
-const Loader = () => {
+const Loader = ({ size = '48px' }) => {
   return (
-    <span class="loader"></span>
-  )
-}
+    <span
+      className="loader"
+      style={{ '--size': typeof size === 'number' ? `${size}px` : size }}
+    ></span>
+  );
+};
 
-export default Loader
+export default Loader;

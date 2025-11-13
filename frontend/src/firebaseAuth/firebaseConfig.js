@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword,signInWithEmailAndPassword,signInWithPopup, GoogleAuthProvider,signOut  } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
 import axios from "axios";
 
 const firebaseConfig = {
@@ -9,7 +9,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_StorageBucket,
   messagingSenderId: import.meta.env.VITE_MessagingSenderId,
   appId: import.meta.env.VITE_AppId,
-  measurementId:import.meta.env.VITE_MeasurementId 
+  measurementId: import.meta.env.VITE_MeasurementId
 };
 
 const provider = new GoogleAuthProvider();
@@ -29,7 +29,7 @@ const getFirebaseToken = async () => {
 
       // Send the token to the server
       const response = await axios
-        .post(import.meta.env.VITE_Backend_URL + "/firebaseTokenVerify",{token})
+        .post(import.meta.env.VITE_Backend_URL + "/firebaseTokenVerify", { token })
         // .then(res => console.log(res))
         .catch(err => console.error(err));
     } catch (error) {
@@ -40,7 +40,7 @@ const getFirebaseToken = async () => {
 
 
 
-export const googleSignInPopUp = async ()=>{
+export const googleSignInPopUp = async () => {
   try {
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -62,23 +62,26 @@ export const googleSignInPopUp = async ()=>{
   }
 }
 
-export const createUser = async (email, password)=>{
+export const createUser = async (email, password) => {
   try {
-    const result = await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     await getFirebaseToken();
-    return true;
+    return { success: true, user };
   } catch (error) {
-    // console.log(error)
-    return false;
+    return {
+      success: false,
+      code: error?.code || null,
+      message: error?.message || "Registration failed",
+    };
   }
-}
+};
 
 export const signIn = async (email, password) => {
   try {
     const result = await signInWithEmailAndPassword(auth, email, password);
-    const user = result.user; // Fixed reference to the userCredential
-    await getFirebaseToken(); // Ensure this function is defined and implemented
+    const user = result.user; 
+    await getFirebaseToken(); 
     return true;
   } catch (error) {
     return false;
