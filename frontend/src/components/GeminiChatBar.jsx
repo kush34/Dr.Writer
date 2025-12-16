@@ -9,6 +9,7 @@ import {
     SidebarMenuItem,
     SidebarFooter,
 } from "@/components/ui/sidebar";
+import { getAuth } from 'firebase/auth';
 import { useEffect, useRef } from "react";
 import { SendHorizontal } from 'lucide-react';
 import { Input } from "@/components/ui/input";
@@ -42,29 +43,92 @@ export function GeminiChatBar({ documentId }) {
         }
     }
     const handleSend = async () => {
+        if (!prompt.trim()) return;
 
-        if (prompt == '') return;
+        const currentPrompt = prompt;
+        setPrompt("");
         setGeminiLoading(true);
-        setPrompt('');
+
+        const tempIndex = responseList.length;
+
+        // Optimistic UI
+        setResponseList((prev) => [
+            ...prev,
+            { prompt: currentPrompt, response: "" },
+        ]);
+
         try {
-            const response = await apiClient.post('/document/userprompt', {
-                userPrompt: prompt,
-                documentId
-            });
-            // console.log(response);
-            if (response.status === 200) {
-                setResponseList([...responseList, response.data]);
-            } else {
-                toast("Could not send your prompt");
+            // 🔐 Get Firebase token
+            const auth = getAuth();
+            const user = auth.currentUser;
+            if (!user) throw new Error("User not authenticated");
+
+            const token = await user.getIdToken();
+
+            const res = await fetch(
+                `${import.meta.env.VITE_Backend_URL}/document/userprompt`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        userPrompt: currentPrompt,
+                        documentId,
+                    }),
+                }
+            );
+
+            if (!res.ok || !res.body) {
+                throw new Error("Stream not available");
             }
 
-        } catch (error) {
-            toast("Something went wrong");
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder("utf-8");
 
+            let buffer = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                const events = buffer.split("\n\n");
+                buffer = events.pop(); // keep incomplete chunk
+
+                for (const event of events) {
+                    if (!event.startsWith("data: ")) continue;
+
+                    const payload = JSON.parse(event.replace("data: ", ""));
+
+                    if (payload.done) return;
+
+                    if (payload.chunk) {
+                        setResponseList((prev) => {
+                            const updated = [...prev];
+                            updated[tempIndex] = {
+                                ...updated[tempIndex],
+                                response: updated[tempIndex].response + payload.chunk,
+                            };
+                            return updated;
+                        });
+                    }
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            toast("Streaming failed");
+
+            // Rollback optimistic UI on failure
+            setResponseList((prev) => prev.slice(0, -1));
         } finally {
             setGeminiLoading(false);
         }
-    }
+    };
+
+
     useEffect(() => {
         fetchChats();
     }, [])
@@ -75,26 +139,27 @@ export function GeminiChatBar({ documentId }) {
                     <SidebarGroupLabel className='text-xl font-semibold'>Dr. Writer</SidebarGroupLabel>
                 </SidebarGroup>
                 <SidebarContent>
-                    <div className="overflow-y-scroll no-scrollbar p-1">
+                    <div className="overflow-y-scroll no-scrollbar p-1 flex flex-col gap-2">
                         {responseList.length <= 0 ? (
                             <div className="px-4 text-zinc-500">
                                 Enter prompt for Gemini response
                             </div>
                         ) : (
                             responseList.map((item, index) => (
-                                <div className="flex flex-col gap-3 w-full">
+                                <div key={index} className="flex flex-col gap-3 w-full">
                                     <div className="flex justify-start">
                                         <div className="bg-zinc-200 text-black rounded-md text-sm p-3 max-w-[80%]">
                                             <Markdown>{item.prompt}</Markdown>
                                         </div>
                                     </div>
                                     <div className="flex justify-end">
-                                        <div className="bg-green-400 text-black rounded-md text-sm p-3 max-w-[80%]">
-                                            <Markdown>{item.response}</Markdown>
+                                        <div className="bg-green-400 text-black rounded-md text-sm p-3 max-w-[80%] whitespace-pre-wrap">
+                                            <Markdown>{item.response || "▍"}</Markdown>
                                         </div>
                                     </div>
                                 </div>
                             ))
+
                         )}
                     </div>
                 </SidebarContent>

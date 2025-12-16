@@ -56,7 +56,7 @@ const Login = ({ setFlag }) => {
     return;
   }
   return (
-    <div className='flex flex-col gap-12 w-full h-screen bg-slate-100'>
+    <div className='flex flex-col gap-12 w-full h-screen bg-slate-100 text-black'>
       <div className="title text-4xl font-medium flex flex-col items-center mt-16 w-full">
         <span className=''>
           Dr.Writer

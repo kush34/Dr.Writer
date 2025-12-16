@@ -6,7 +6,7 @@ import User from '../Models/userModel.js';
 import Document from '../Models/documentModel.js'
 import fs from 'fs';
 import mammoth from 'mammoth';
-import useGemini from '../service/gemini.js'
+import useGemini, { useGeminiStream } from '../service/gemini.js'
 import rateLimit from 'express-rate-limit';
 import Chat from '../Models/chatModel.js';
 
@@ -161,25 +161,61 @@ router.post("/adduser", firebaseTokenVerify, async (req, res) => {
 
 });
 
-//Gemini prompt route
-router.post("/userprompt", geminiLimiter, firebaseTokenVerify, async (req, res) => {
-  try {
-    const user_id = req.user_id;
+// Gemini user Prompt response endpoint
+router.post(
+  "/userprompt",
+  geminiLimiter,
+  firebaseTokenVerify,
+  async (req, res) => {
     const { userPrompt, documentId } = req.body;
+    const user_id = req.user_id;
 
     if (!userPrompt || !user_id || !documentId) {
-      return res.status(400).send('not prompt found pls try again...')
+      return res.status(400).end("Invalid payload");
     }
-    const response = await useGemini(userPrompt);
-    const newChat = await Chat.create({documentId,prompt:userPrompt,response:response.rawText})
-    if (!response || !newChat) return res.status(400).send({ error: "could not send response from Gemini" });
-    
-    res.send(newChat)
-  } catch (error) {
-    res.status(500).send({ error: "Something went wrong" })
-    console.log(error);
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.(); 
+
+    let fullResponse = "";
+
+    try {
+      const result = await useGeminiStream(userPrompt);
+
+      for await (const chunk of result.stream) {
+        const text =
+          chunk.candidates?.[0]?.content?.parts
+            ?.map((p) => p.text)
+            .join("") || "";
+
+        if (!text) continue;
+
+        fullResponse += text;
+
+        res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
+      }
+
+      await Chat.create({
+        documentId,
+        prompt: userPrompt,
+        response: fullResponse,
+      });
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      console.error("Gemini stream error:", err);
+      res.write(
+        `data: ${JSON.stringify({ error: "LLM stream failed" })}\n\n`
+      );
+      res.end();
+    }
   }
-});
+);
+
+
 
 //sync the offline file changes made by user 
 router.post("/syncDocument", firebaseTokenVerify, async (req, res) => {
