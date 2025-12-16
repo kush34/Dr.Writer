@@ -16,7 +16,7 @@ const App = () => {
     <AppLayout>
       <Analytics />
       <div className='flex w-full h-screen'>
-        <div className='hidden xl:inline xl:w-1/2 h-full bg-[#e6fdec]'>
+        <div className='hidden xl:inline xl:w-1/2 h-full bg-[#e6fdec] text-black'>
           <div className='w-full h-full flex flex-col justify-center items-center'>
             <img src="./login.svg" alt="login Illstration" className='w-1/2 h-1/2' />
             <span className='text-4xl font-medium'>Edit Any Documents</span>
