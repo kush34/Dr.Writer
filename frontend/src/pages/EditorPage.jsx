@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom';
-import 'react-quill/dist/quill.snow.css'; // Snow theme (other options: bubble, core)
 import { UserContextProvider } from '@/context/UserContext';
 import EditorPageLayout from './EditorPageLayout'
 import Editor from '../components/Editor';
