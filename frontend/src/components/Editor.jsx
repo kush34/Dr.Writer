@@ -1,183 +1,172 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
-import ReactQuill from 'react-quill';
-import { UserContext } from '@/context/UserContext';
-import apiClient from '@/service/axiosConfig';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useContext, useEffect, useState } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import { TextStyle } from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import TextAlign from "@tiptap/extension-text-align";
+
+
+import { UserContext } from "@/context/UserContext";
+import { ThemeContext } from "@/context/ThemeContext";
+import apiClient from "@/service/axiosConfig";
+import socket from "@/service/socket";
+
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import EditFileDialog from '../components/EditFileDialog';
-import ShareFileDialog from '../components/ShareFileDialoag';
-import socket from '@/service/socket'; // Import the shared socket instance
+import { Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Printer } from 'lucide-react';
-import '../service/IndexDb'
-import { addDocument, updateDocumentIndexDb, syncData } from '../service/IndexDb';
-import { ThemeContext } from '@/context/ThemeContext';
+
+import EditFileDialog from "../components/EditFileDialog";
+import ShareFileDialog from "../components/ShareFileDialoag";
+
+import "../service/IndexDb";
+import { addDocument, syncData } from "../service/IndexDb";
+
 const Editor = () => {
-    const { theme } = useContext(ThemeContext);
-    const { user, loading, setLoading } = useContext(UserContext);
-    const navigate = useNavigate();
-    const quillRef = useRef(null);
-    const id = useParams();
-    const { toast } = useToast();
-    const [fileInfo, setFileInfo] = useState();
-    const [content, setContent] = useState('');
-    const [title, setTitle] = useState(fileInfo?.title);
+  const { theme } = useContext(ThemeContext);
+  const { user, loading } = useContext(UserContext);
+  const { toast } = useToast();
 
-    const modules = {
-        toolbar: [
-          [{ font: [] }], // Font family
-          [{ size: ['small', false, 'large', 'huge'] }], // Font size
-          ['bold', 'italic', 'underline'], // Bold, italic, underline
-          [{ color: [] }, { background: [] }], // Font color and background color
-          [{ align: [] }], // Text alignment
-          ['clean'], // Clear formatting
-        //   ["link", "image"],
-        ],
+  const navigate = useNavigate();
+  const { id } = useParams();
+
+  const [fileInfo, setFileInfo] = useState(null);
+  const [title, setTitle] = useState("");
+  const [docContent, setDocContent] = useState(null);
+
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      TextStyle,
+      Color,
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
+      }),
+    ],
+    content: docContent,
+    onUpdate({ editor }) {
+      const json = editor.getJSON();
+      socket.emit("text-changes", json, id);
+    },
+  });
+
+
+  const getContent = async () => {
+    try {
+      const response = await apiClient.post("/document/documentData", {
+        file_id: id,
+      });
+      if (response.status === 200) {
+        setFileInfo(response.data);
+        setTitle(response.data.title);
+        setDocContent(response.data.content); // JSON
+        console.log(response.data)
+      }
+    } catch (error) {
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Could not load Document Content"
+        })
+      }
+    }
+  };
+
+  const updateDocument = async () => {
+    const json = editor?.getJSON();
+
+    try {
+      await apiClient.post("/document/documentUpdate", {
+        file_id: id,
+        title,
+        newContent: json,
+      });
+
+      toast({ description: "Changes saved" });
+    } catch {
+      await addDocument({
+        _id: id,
+        title,
+        newContent: json,
+      });
+
+      toast({ description: "Changes saved offline" });
+    }
+  };
+
+
+  useEffect(() => {
+    if (!user || !id) return;
+
+    (async () => {
+      const synced = await syncData(id);
+      if (synced) await getContent();
+    })();
+  }, [user, id]);
+  useEffect(() => {
+    if (!editor || !docContent) return;
+
+    editor.commands.setContent(docContent, false);
+  }, [editor, docContent]);
+
+  useEffect(() => {
+    if (!editor || !user || !id) return;
+
+    socket.emit("enter", user.email, id);
+
+    socket.on("text-changes", (json) => {
+      editor.commands.setContent(json, false);
+    });
+
+    return () => {
+      socket.off("text-changes");
     };
-
-    const formats = [
-        'font', 'size', 'header',
-        'bold', 'italic', 'underline', 'strike',
-        'blockquote', 'code-block',
-        'list', 'bullet',
-        'script', 'indent', 'direction',
-        'align',
-        'color', 'background',
-        'link', 'image', 'video', 'formula',
-        'clean'
-    ];
+  }, [editor, user, id]);
 
 
-    const handleChange = (content, delta, source, editor) => {
-        if (source === "user") {
-            setContent(content);
-            socket.emit('text-changes', delta, id.id);
-        }
-    };
+  if (loading) return <p>Loading...</p>;
+  if (!user) return <p>User not logged in</p>;
 
-    const insertDelta = (delta) => {
-        if (quillRef.current && quillRef.current.getEditor) {
-            const quill = quillRef.current.getEditor();
-            quill.updateContents(delta);
-        } else {
-            console.error("Quill instance is not available");
-        }
-    };
+  return (
+    <div>
+      <div className="nav flex justify-between">
+        <div className="title flex font-semibold text-xl">
+          <div className="my-2">{fileInfo?.title ?? "Title"}</div>
 
-    const getContent = async () => {
-        try {
-            const response = await apiClient.post('/document/documentData', {
-                file_id: id.id,
-            });
-            // console.log(response.data);
-            setFileInfo(response.data);
-            setContent(response.data.content);
-        } catch (error) {
-            // console.log(error);
-        }
-    };
+          <div className="mx-2 text-sm text-zinc-400 hover:text-zinc-700 cursor-pointer">
+            <EditFileDialog fileInfo={fileInfo} setTitle={setTitle} />
+          </div>
 
-    const updateDocument = async () => {
-        try {
-            const response = await apiClient.post('/document/documentUpdate', {
-                file_id: id.id,
-                title,
-                newContent: content,
-            });
-            if (response.status === 200) {
-                toast({
-                    description: "Changes saved",
-                });
-                return;
-            }
-        } catch (error) {
-            console.error("API request failed, saving to IndexedDB:", error);
-            try {
-                await addDocument({
-                    _id: id.id,
-                    title: fileInfo?.title,
-                    newContent: content,
-                });
-                toast({
-                    description: "Changes saved offline",
-                });
-            } catch (dbError) {
-                console.error("Failed to save to IndexedDB:", dbError);
-            }
-        }
-    };
+          <ShareFileDialog />
 
-    useEffect(() => {
-        const fetchData = async () => {
-            const syncSuccess = await syncData(id.id);
-            if (syncSuccess) {
-                await getContent();
-            } else {
-                console.error("Sync failed. Fetching content skipped.");
-            }
-        };
-
-        fetchData();
-    }, [user]);
-    useEffect(() => {
-        socket.emit('enter', user?.email, id.id);
-
-        socket.on('enter', async (email, code) => {
-            console.log(`User joined:`, email);
-        });
-
-        socket.on('text-changes', async (delta) => {
-            // console.log(delta);
-            insertDelta(delta);
-        });
-
-        socket.on('test', async () => {
-            console.log(`Test event fired`);
-        });
-
-        return () => {
-            socket.off('enter');
-            socket.off('text-changes');
-            socket.off('test');
-        };
-    }, []);
-    if (loading) return <p>Loading...</p>;
-    if (!user) return <p>User not logged in</p>;
-    return (
-        <div>
-            <div className='nav flex justify-between'>
-                <div className='title flex font-semibold text-xl'>
-                    <div className='my-2'>
-                        {fileInfo ? fileInfo.title : `Title`}
-                    </div>
-                    <div className="editbtn text-sm mx-2 text-zinc-400 hover:text-zinc-700 cursor-pointer">
-                        <EditFileDialog fileInfo={fileInfo} setTitle={setTitle} />
-                    </div>
-                    <div className="editbtn text-sm cursor-pointer">
-                        <ShareFileDialog className='border-2 text-black hover:bg-black hover:text-white ' />
-                    </div>
-                    <div className="editbtn text-sm mx-2 cursor-pointer">
-                        <Button onClick={window.print} className={`${theme ? "text-black" : ""} hover:bg-black hover:text-white`} variant="outline"><Printer /></Button>
-                    </div>
-                </div>
-                <div className="title m-2 flex justify-end gap-3">
-                    <Button onClick={updateDocument} className={`${theme ? "text-black" : ""} hover:bg-black hover:text-white`} variant="outline">Save</Button>
-                    <Button onClick={() => navigate(`/home`)} className={`${theme ? "text-black" : ""} hover:bg-black hover:text-white`} variant="outline">Back</Button>
-                </div>
-            </div>
-            <ReactQuill
-                theme="snow"
-                className='editor'
-                value={content}
-                onChange={handleChange}
-                modules={modules}
-                formats={formats}
-                ref={quillRef}
-                placeholder="Start typing..."
-                style={{ height: '80vh' }}
-            />
+          <Button
+            onClick={window.print}
+            variant="outline"
+            className={`mx-2 ${theme ? "text-black" : ""}`}
+          >
+            <Printer />
+          </Button>
         </div>
-    );
+
+        <div className="m-2 flex gap-3 text-black">
+          <Button onClick={updateDocument} variant="outline">
+            Save
+          </Button>
+          <Button onClick={() => navigate("/home")} variant="outline">
+            Back
+          </Button>
+        </div>
+      </div>
+
+      <EditorContent
+        editor={editor}
+        className="editor border rounded-md p-4"
+        style={{ minHeight: "80vh" }}
+
+      />
+    </div>
+  );
 };
 
 export default Editor;
