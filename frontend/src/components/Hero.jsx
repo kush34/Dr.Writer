@@ -1,19 +1,27 @@
-import React from 'react'
+import React from "react";
+import { BackgroundLines } from "./BackgroundLines";
+
 
 const Hero = () => {
   return (
-    <div className='z-10
-    w-full h-[80vh] flex flex-col gap-10 justify-center items-center'>
-        <div className="title text-2xl md:text-5xl text-center font-medium">
-            The Only 
-            <span className='text-green-600 font-bold italic'> Document</span>  <br></br>
-            Editor you need
-        </div>
-        <a href='/login' className='border rounded py-2 px-4 text-white-800 font-medium hover:bg-zinc-100 hover:text-black  duration-250 ease-out'>
-            Get Started
-        </a>
-    </div>
-  )
-}
+    <section className="h-1/2 flex flex-col  gap-8 items-center py-32 border-b-2 border-dashed">
+      <div className="relative z-10 text-center">
+        <h1 className="text-5xl font-bold text-black leading-tight">
+          One stop solution for <br />
+          your Documents
+        </h1>
+        <p className="text-secondary">Edit all your Documents at single point</p>
+      </div>
+      <div className="cta flex gap-5">
+        <button className="shadow text-foreground border px-5 py-2 rounded-2xl cursor-pointer">
+          pricing
+        </button>
+        <button className=" shadow bg-primary px-5 py-2 rounded-2xl cursor-pointer">
+          Start Writing
+        </button>
+      </div>
+    </section>
+  );
+};
 
-export default Hero
+export default Hero;
