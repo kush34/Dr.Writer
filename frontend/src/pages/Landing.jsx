@@ -10,13 +10,16 @@ import { useRef } from 'react';
 const Landing = () => {
     const pricingRef = useRef(null);
     const executeScroll = () => pricingRef.current.scrollIntoView()
+
+    const faqRef = useRef(null);
+    const faqexecuteScroll = () => faqRef.current.scrollIntoView()
     return (
         <div className='w-full h-screen text-white relative'>
-            <Navbar />
-            <Hero executeScroll={executeScroll} />
+            <Navbar faqexecuteScroll={faqexecuteScroll} executeScroll={executeScroll}/>
+            <Hero executeScroll={executeScroll}/>
             <Features />
             <Plans pricingRef={pricingRef} />
-            <FAQs />
+            <FAQs faqRef={faqRef} />
             <Footer />
         </div>
     )

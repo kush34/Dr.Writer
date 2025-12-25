@@ -2,7 +2,7 @@ import { ArrowDown, ChevronDown, X } from "lucide-react";
 import { useState } from "react"
 
 
-const FAQs = () => {
+const FAQs = ({faqRef}) => {
     const [currentIdx, setCurrentIdx] = useState(null);
     const faqs = [
         {
@@ -24,7 +24,7 @@ const FAQs = () => {
     ]
 
     return (
-        <div className="text-secondary flex flex-col justify-center items-center p-10 border ">
+        <div ref={faqRef} className="text-secondary flex flex-col justify-center items-center p-10 border ">
             <div className="title font-medium text-2xl">
                 FAQs
             </div>

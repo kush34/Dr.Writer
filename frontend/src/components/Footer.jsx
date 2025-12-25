@@ -28,7 +28,7 @@ const Footer = () => {
       <div className="socials flex gap-2 items-center text-md py-5">
         {socials.map((social,index)=>{
           return(
-            <a href={social.link}>{social.icon}</a>
+            <a key={index} href={social.link}>{social.icon}</a>
           )
         })}
       </div>
