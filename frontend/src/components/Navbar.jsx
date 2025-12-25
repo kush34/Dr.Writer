@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Menu } from "lucide-react"
 import { useNavigate } from 'react-router-dom';
 const Navbar = () => {
+  const navigate = useNavigate();
+
   const links = [
     {
       title: "Pricing",
@@ -33,9 +35,9 @@ const Navbar = () => {
         </div>
       </div>
       <div className="auths">
-        <span className='bg-primary shadow text-background font-medium px-5 py-2 rounded-2xl font-light cursor-pointer'>
+        <button onClick={()=>navigate("/login")} className='bg-primary shadow text-background font-medium px-5 py-2 rounded-2xl font-light cursor-pointer'>
           Create Account
-        </span>
+        </button>
       </div>
     </div>
   )
