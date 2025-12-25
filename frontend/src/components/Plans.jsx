@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 
-const Plans = () => {
+const Plans = ({pricingRef}) => {
   const plans = [
     {
       title: "Free Plan",
@@ -40,7 +40,7 @@ const Plans = () => {
   ];
 
   return (
-    <div className="py-10 text-secondary flex flex-col gap-12 items-center">
+    <div ref={pricingRef} className="py-10 text-secondary flex flex-col gap-12 items-center">
       <h1 className="text-4xl font-medium">Our Plans</h1>
 
       {/* IMPORTANT: items-stretch */}
