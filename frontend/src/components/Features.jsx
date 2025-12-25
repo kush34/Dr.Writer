@@ -30,7 +30,7 @@ const Features = () => {
                 Features
             </div>
             <div className="grid place-items-center text-secondary m-12">
-                <ul className="grid grid-cols-2 gap-12 max-w-4xl">
+                <ul className="grid xl:grid-cols-2 gap-12 max-w-4xl">
                     {Features.map((feature,index) => {
                         return (
                             <li key={index} className='flex flex-col flex-wrap gap-2 border shadow p-5 rounded-2xl hover:shadow-none cursor-pointer transition-200ms ease-in'>

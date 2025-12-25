@@ -22,7 +22,7 @@ const Navbar = ({faqexecuteScroll,executeScroll}) => {
         <div className="brand font-bold">
           DrWriter
         </div>
-        <div className="links flex gap-5">
+        <div className="hidden xl:flex links gap-5">
           {links.map((link,index) => {
             return (
               <button key={index} onClick={link.click}>
