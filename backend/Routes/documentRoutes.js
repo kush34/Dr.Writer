@@ -284,7 +284,7 @@ router.get('/getChats/:documentId',firebaseTokenVerify,async (req,res)=>{
   try {
     const {documentId} = req.params;
     const getChats = await Chat.find({documentId})
-    res.send(getChats)
+    res.send({documentChat:getChats})
   } catch (error) {
     res.send({error:"Could not retreive your chats",info:"/document/getChats/:documentId ENDPOINT"})
     console.log(error);

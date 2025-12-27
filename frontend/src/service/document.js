@@ -32,3 +32,8 @@ export const updateDocumentApi = async ({ id, title, content }) => {
     newContent: content,
   });
 };
+
+export const getChatsForDocument = async(documentId)=>{
+  const res = await apiClient.get(`/document/getChats/${documentId}`)
+  return res.data
+}
