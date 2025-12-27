@@ -22,6 +22,8 @@ import apiClient from "@/service/axiosConfig";
 import { ThemeContext } from "@/context/ThemeContext";
 import Markdown from "react-markdown";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getChatsForDocument } from "@/service/document";
 
 export function GeminiChatBar({ documentId }) {
     const { user, loading } = useContext(UserContext);
@@ -32,44 +34,42 @@ export function GeminiChatBar({ documentId }) {
     const [geminiLoading, setGeminiLoading] = useState(false);
     const [responseList, setResponseList] = useState([]);
 
-    const fetchChats = async () => {
-        try {
-            const response = await apiClient.get(`document/getChats/${documentId}`)
-            console.log(response.data)
-            if (response.status === 200) {
-                setResponseList(response.data)
-            }
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "Could not Document LLM Chats",
-            });
+    const queryClient = useQueryClient();
 
-            console.log('Fetching chats from GET document/getChats/:documentId ', error)
-        }
-    }
+    const { data, isLoading, error } = useQuery({
+        queryKey: ["documentChat", documentId],
+        enabled: !!user && !!documentId,
+        queryFn: () => getChatsForDocument(documentId)
+    });
+    
     const handleSend = async () => {
-        if (!prompt.trim()) return;
+        if (!prompt.trim() || geminiLoading) return;
 
         const currentPrompt = prompt;
         setPrompt("");
         setGeminiLoading(true);
 
-        const tempIndex = responseList.length;
+        const chatKey = ["documentChat", documentId];
 
-        // Optimistic UI
-        setResponseList((prev) => [
-            ...prev,
-            { prompt: currentPrompt, response: "" },
-        ]);
+        //Optimistic update: add user message + empty assistant message
+        queryClient.setQueryData(chatKey, (old) => {
+            const prev = old?.documentChat ?? [];
+            return {
+                ...old,
+                documentChat: [
+                    ...prev,
+                    { prompt: currentPrompt, response: "", streaming: true },
+                ],
+            };
+        });
 
         try {
-            // 🔐 Get Firebase token
+            // 🔐 Firebase token
             const auth = getAuth();
-            const user = auth.currentUser;
-            if (!user) throw new Error("User not authenticated");
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) throw new Error("User not authenticated");
 
-            const token = await user.getIdToken();
+            const token = await firebaseUser.getIdToken();
 
             const res = await fetch(
                 `${import.meta.env.VITE_Backend_URL}/document/userprompt`,
@@ -100,7 +100,6 @@ export function GeminiChatBar({ documentId }) {
                 if (done) break;
 
                 buffer += decoder.decode(value, { stream: true });
-
                 const events = buffer.split("\n\n");
                 buffer = events.pop(); // keep incomplete chunk
 
@@ -109,16 +108,29 @@ export function GeminiChatBar({ documentId }) {
 
                     const payload = JSON.parse(event.replace("data: ", ""));
 
-                    if (payload.done) return;
+                    if (payload.done) {
+                        // mark streaming false
+                        queryClient.setQueryData(chatKey, (old) => {
+                            const chats = [...old.documentChat];
+                            const last = chats[chats.length - 1];
+                            chats[chats.length - 1] = { ...last, streaming: false };
+                            return { ...old, documentChat: chats };
+                        });
+                        return;
+                    }
 
                     if (payload.chunk) {
-                        setResponseList((prev) => {
-                            const updated = [...prev];
-                            updated[tempIndex] = {
-                                ...updated[tempIndex],
-                                response: updated[tempIndex].response + payload.chunk,
+                        // Stream chunk into cache
+                        queryClient.setQueryData(chatKey, (old) => {
+                            const chats = [...old.documentChat];
+                            const last = chats[chats.length - 1];
+
+                            chats[chats.length - 1] = {
+                                ...last,
+                                response: last.response + payload.chunk,
                             };
-                            return updated;
+
+                            return { ...old, documentChat: chats };
                         });
                     }
                 }
@@ -127,30 +139,28 @@ export function GeminiChatBar({ documentId }) {
             console.error(err);
             toast({
                 title: "Error",
-                description: "Streaming failed",
+                description: "Gemini streaming failed",
             });
 
-
-            // Rollback optimistic UI on failure
-            setResponseList((prev) => prev.slice(0, -1));
+            // Rollback assistant message only
+            queryClient.setQueryData(chatKey, (old) => {
+                const chats = [...old.documentChat];
+                chats.pop(); // remove assistant
+                return { ...old, documentChat: chats };
+            });
         } finally {
             setGeminiLoading(false);
         }
     };
 
-    const copyPrompt = async (text)=>{
+    const copyPrompt = async (text) => {
         try {
             await navigator.clipboard.writeText(text);
         } catch (error) {
-             console.error(error);
-            toast({title:"Error",description:"Could not copy!"})
+            console.error(error);
+            toast({ title: "Error", description: "Could not copy!" })
         }
     }
-    useEffect(() => {
-        if(loading && !user) return;
-        if (!documentId) return;
-            fetchChats();
-    }, [documentId,loading,user]);
 
     if (loading) return <p>Loading...</p>;
     if (!user) return <p>User not logged in</p>;
@@ -162,12 +172,12 @@ export function GeminiChatBar({ documentId }) {
                 </SidebarGroup>
                 <SidebarContent>
                     <div className="overflow-y-scroll no-scrollbar p-1 flex flex-col gap-2">
-                        {responseList.length <= 0 ? (
+                        {data?.documentChat?.length <= 0 ? (
                             <div className="px-4 text-zinc-500">
                                 Enter prompt for Gemini response
                             </div>
                         ) : (
-                            responseList.map((item, index) => (
+                            data?.documentChat?.map((item, index) => (
                                 <div key={index} className="flex flex-col gap-3 w-full">
                                     <div className="flex justify-start">
                                         <div className="bg-zinc-200 text-black rounded-md text-sm p-3 max-w-[80%]">
@@ -180,7 +190,7 @@ export function GeminiChatBar({ documentId }) {
                                         </div>
                                     </div>
                                     <div className="flex text-sm justify-end">
-                                        <button onClick={()=>copyPrompt(item.response)}>
+                                        <button onClick={() => copyPrompt(item.response)}>
                                             <Copy size={12} />
                                         </button>
                                     </div>

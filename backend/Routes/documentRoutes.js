@@ -57,9 +57,9 @@ router.get('/documentList', firebaseTokenVerify, async (req, res) => {
     // console.log(`document list request...`)
     const user_id = req.user_id;
     if (user_id) {
-      const documentList = await Document.find({ user_id });
+      const documentList = await Document.find({ user_id }).select("title createdAt");
       if (documentList) {
-        res.status(200).send(documentList);
+        res.status(200).send({documents:documentList});
       } else {
         res.status(404).send("no documents found");
       }
@@ -284,7 +284,7 @@ router.get('/getChats/:documentId',firebaseTokenVerify,async (req,res)=>{
   try {
     const {documentId} = req.params;
     const getChats = await Chat.find({documentId})
-    res.send(getChats)
+    res.send({documentChat:getChats})
   } catch (error) {
     res.send({error:"Could not retreive your chats",info:"/document/getChats/:documentId ENDPOINT"})
     console.log(error);

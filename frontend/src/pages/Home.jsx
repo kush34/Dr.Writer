@@ -1,10 +1,9 @@
-import React, { useContext, useRef, useState } from 'react';
-import Layout from './Layout';
-import { UserContextProvider } from '../context/UserContext';
-import Files  from '../components/Files';
+import React, { useContext, useRef, useState } from "react";
+import Layout from "./Layout";
+import Files from "../components/Files";
 import { Button } from "@/components/ui/button";
-import apiClient from '@/service/axiosConfig';
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast";
+import { ThemeContext } from "@/context/ThemeContext";
 import {
   Dialog,
   DialogContent,
@@ -13,104 +12,103 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Description } from '@radix-ui/react-dialog';
-import { ThemeContext } from '@/context/ThemeContext';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createDocument, uploadDocument } from "@/service/document";
 
 const Home = () => {
   const { toast } = useToast();
-  const {theme} = useContext(ThemeContext)
-  const [newTitle,setNewTitle] = useState("New Document");
+  const { theme } = useContext(ThemeContext);
+  const queryClient = useQueryClient();
+
+  const [newTitle, setNewTitle] = useState("New Document");
   const hiddenFileInput = useRef(null);
-  const handleAdd = async() =>{
-    try{
-      const responce  = await apiClient.post('/document/createDocument',{
-        title: `${newTitle}`
-      });
-      if(responce.status == 200){
-        toast({
-          description: "New Document created",
-        });
-      }
-    }catch(error){
-      console.log(error);
-    }
-  }
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+
+  // CREATE DOC
+  const createMutation = useMutation({
+    mutationFn: createDocument,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      toast({ description: "New document created" });
+    },
+  });
+
+  // UPLOAD DOC
+  const uploadMutation = useMutation({
+    mutationFn: uploadDocument,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      toast({ description: "File uploaded successfully" });
+    },
+  });
+
+  const handleAdd = () => {
+    if (!newTitle.trim()) return;
+    createMutation.mutate(newTitle);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const formData = new FormData();
     formData.append("file", file);
 
-    try {
-        const response  = await apiClient.post('/document/fileUpload',
-          formData, {
-            headers: { "Content-Type": "multipart/form-data" }
-          });
-          if(response == 200){
-            toast({
-              Description:'file uploaded successfully'
-            });
-          }
-    } catch (error) {
-        console.error("Error uploading file:", error);
-    }
-};
+    uploadMutation.mutate(formData);
+  };
+
   return (
-    <UserContextProvider>
-      <Layout>
-          <Files>
-          </Files>
-          <div className="actions relative flex justify-end mr-12">
-            <div>
-              {/* <Button onClick={handleAdd} className='bg-zinc-900 border-2 border-zinc-900 text-white ' variant="outline">Add</Button> */}
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className={`bg-green-400`}>Add</Button>
-                </DialogTrigger>
-                <DialogContent className={`${theme=='dark' ? "bg-zinc-800 ":""} sm:max-w-[425px]`}>
-                  <DialogHeader>
-                    <DialogTitle>Create New Document</DialogTitle>
-                    <DialogDescription>
-                      Click save when you're done.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="name" className="text-right">
-                        Title
-                      </Label>
-                      <Input
-                        id="name"
-                        value={newTitle}
-                        onChange={(e)=>setNewTitle(e.target.value)}
-                        className='col-span-3 text-black'
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" onClick={handleAdd}>Create</Button>
-                    <input 
-                    type="file"
-                    className='hidden' 
-                    ref={hiddenFileInput}
-                    accept=".doc,.docx"
-                    onChange={handleFileUpload}
-                    name="" id="" />
-                    <Button type="submit" onClick={(e)=>hiddenFileInput.current.click()}>Upload</Button>
+    <Layout>
+      <Files />
 
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+      <div className="flex justify-end mr-12">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="bg-green-400">Add</Button>
+          </DialogTrigger>
 
+          <DialogContent className={theme === "dark" ? "bg-zinc-800" : ""}>
+            <DialogHeader>
+              <DialogTitle>Create New Document</DialogTitle>
+              <DialogDescription>Click save when you're done.</DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Title</Label>
+                <Input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="col-span-3 text-black"
+                />
+              </div>
             </div>
-          </div>
-      </Layout>
-    </UserContextProvider>
-  )
-}
 
-export default Home
+            <DialogFooter>
+              <Button onClick={handleAdd} disabled={createMutation.isPending}>
+                Create
+              </Button>
+
+              <input
+                type="file"
+                hidden
+                ref={hiddenFileInput}
+                accept=".doc,.docx"
+                onChange={handleFileUpload}
+              />
+
+              <Button onClick={() => hiddenFileInput.current.click()}>
+                Upload
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </Layout>
+  );
+};
+
+export default Home;
