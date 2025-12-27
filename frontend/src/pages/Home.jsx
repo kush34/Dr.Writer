@@ -22,7 +22,7 @@ import { ThemeContext } from '@/context/ThemeContext';
 const Home = () => {
   const { toast } = useToast();
   const {theme} = useContext(ThemeContext)
-  const [newTitle,setNewTitle] = useState();
+  const [newTitle,setNewTitle] = useState("New Document");
   const hiddenFileInput = useRef(null);
   const handleAdd = async() =>{
     try{
@@ -85,7 +85,7 @@ const Home = () => {
                       </Label>
                       <Input
                         id="name"
-                        defaultValue="New Document"
+                        value={newTitle}
                         onChange={(e)=>setNewTitle(e.target.value)}
                         className='col-span-3 text-black'
                       />
