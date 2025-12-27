@@ -224,17 +224,17 @@ router.post("/syncDocument", firebaseTokenVerify, async (req, res) => {
     const { file_id, title, newContent } = req.body;
     const document = await Document.findOne({ _id: file_id });
     if (!document) {
-      res.status(404).send('document not found...');
+      return res.status(404).send('document not found...');
     }
     if (!file_id || !title || !newContent) {
-      res.status(422).send('insufficient data...');
+      return res.status(422).send('insufficient data...');
     }
     // Check if the user is authorized to access the document
     if (document.user_id.toString() === user_id.toString() || document.users.includes(user_id.toString())) {
       if (title != document.title || newContent != document.content) {
         const updateddocument = await Document.findOneAndUpdate(
           { _id: file_id },
-          { title: title, content: newContent },
+          { title: title, content: JSON.stringify(newContent) },
           { new: true }
         );
         return res.status(200).send('document synced'); // Send the document if user is authorized
@@ -244,6 +244,7 @@ router.post("/syncDocument", firebaseTokenVerify, async (req, res) => {
     // If user is not authorized, send a 403 response
     return res.status(403).send("You are not authorized to access this document");
   } catch (error) {
+    res.status(500).send({message:"Something went wrong!"})
     console.log(error);
   }
 });
