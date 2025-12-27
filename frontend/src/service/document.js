@@ -16,3 +16,19 @@ export const uploadDocument = async (formData) => {
   });
   return res.data;
 };
+
+
+export const fetchDocumentData = async (id) => {
+  const res = await apiClient.post("/document/documentData", {
+    file_id: id,
+  });
+  return res.data;
+};
+
+export const updateDocumentApi = async ({ id, title, content }) => {
+  await apiClient.post("/document/documentUpdate", {
+    file_id: id,
+    title,
+    newContent: content,
+  });
+};
