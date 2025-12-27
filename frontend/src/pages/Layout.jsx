@@ -4,9 +4,13 @@ import { AppSidebar } from "../components/App-sidebar";
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeContext } from "@/context/ThemeContext";
 const Layout = ({ children }) => {
-  const {theme} = useContext(ThemeContext);
+  const themeCtx = useContext(ThemeContext)
+  if (!themeCtx) {
+    throw new Error("ThemeContext.Provider is missing");
+  }
+  const { theme } = themeCtx;
   return (
-    <div className={`flex ${theme=='dark' ? "bg-zinc-900 text-white":"bg-zinc-100 text-black" }`}>
+    <div className={`flex ${theme == 'dark' ? "bg-zinc-900 text-white" : "bg-zinc-100 text-black"}`}>
       <SidebarProvider>
         <AppSidebar />
         <main className="flex-1 p-4 ">

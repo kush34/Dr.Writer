@@ -66,8 +66,16 @@ const items = [
 ];
 
 export function AppSidebar() {
-  const { theme } = useContext(ThemeContext);
-  const { user, loading } = useContext(UserContext);
+  const themeCtx = useContext(ThemeContext);
+  if (!themeCtx) {
+    throw new Error("ThemeContext.Provider is missing");
+  }
+  const { theme } = themeCtx;
+  const userCtx = useContext(UserContext);
+  if (!userCtx) {
+    throw new Error("UserContext.Provider is missing");
+  }
+  const { user, loading } = userCtx;
   const navigate = useNavigate();
   if (loading) return <p>Loading...</p>;
   if (!user) return <p>User not logged in</p>;
