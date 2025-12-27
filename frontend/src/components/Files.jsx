@@ -1,43 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import FileCard from './FileCard';
-import apiClient from '@/service/axiosConfig';
-import { useContext } from "react";
-import { UserContext } from "../context/UserContext";
-import Loader from '@/components/loaders/Loader.jsx';
-
-
-
+import { useQuery } from "@tanstack/react-query";
+import { fetchDocuments } from "@/service/document.js";
+import FileCard from "./FileCard";
 
 const Files = () => {
-  const [list, setList] = useState([]);
-  const { user, loading } = useContext(UserContext);
-  const [isLoading,setIsLoading] = useState(false);
-  const getDocList = async () => {
-    setIsLoading(true);
-    try {
-      if (user) { 
-        const response = await apiClient.get('/document/documentList');
-        // console.log(`Document list for display`);
-        // console.log(response);
-        setList(response.data)
-      } else {
-        console.error("User is not logged in.");
-      }
-    } catch (error) {
-      console.error("Error fetching document list:", error);
-    }finally{
-      setIsLoading(false);
-    }
-  };
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["documents"],
+    queryFn: fetchDocuments,
+  });
 
-  useEffect(() => {
-    if (user) { 
-      getDocList(); 
-    }
-  }, [user]); // Only re-run the effect when the 'user' changes
-
-  // if (loading) return <p>Loading...</p>;
-  if (!user) return <p>User not logged in</p>;
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Something broke</div>;
 
   return (
     <div className='p-4'>
@@ -52,7 +24,7 @@ const Files = () => {
         (
       <div className='h-[80vh] flex flex-col justify-between'>
         <div className="card-list flex flex-wrap gap-5">
-          {list.length>0 ? (list.map((file,index)=>{
+          {data.documents.length>0 ? (data.documents.map((file,index)=>{
               return (
                 <FileCard key={index} file={file}/>
               );
@@ -66,13 +38,13 @@ const Files = () => {
           }
         </div>
         <div className='text-zinc-500'>
-          Files : {list.length}
+          Files : {data.documents.length}
         </div>
       </div>
         )
       }
     </div>
-  )
-}
+  );
+};
 
 export default Files;
