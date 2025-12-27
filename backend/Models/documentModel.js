@@ -1,15 +1,18 @@
 import mongoose from "mongoose";
 
 const documentSchema = new mongoose.Schema({
-    title: { 
+    title: {
         type: String,
-        default:'document'
+        default: 'document'
     },
-    content:{ 
-        type: String,
-        default:'get started'
+    content: {
+        type: mongoose.Schema.Types.Mixed,
+        default: () => ({
+            type: "doc",
+            content: [{ type: "paragraph" }],
+        }),
     },
-    user_id:{
+    user_id: {
         type: mongoose.Schema.Types.ObjectId, ref: 'User'
     },
     users: [String],

@@ -1,183 +1,202 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
-import ReactQuill from 'react-quill';
-import { UserContext } from '@/context/UserContext';
-import apiClient from '@/service/axiosConfig';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Button } from "@/components/ui/button";
-import EditFileDialog from '../components/EditFileDialog';
-import ShareFileDialog from '../components/ShareFileDialoag';
-import socket from '@/service/socket'; // Import the shared socket instance
+import { ThemeContext } from "@/context/ThemeContext";
+import { UserContext } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
-import { Printer } from 'lucide-react';
-import '../service/IndexDb'
-import { addDocument, updateDocumentIndexDb, syncData } from '../service/IndexDb';
-import { ThemeContext } from '@/context/ThemeContext';
+import apiClient from "@/service/axiosConfig";
+import socket from "@/service/socket";
+import TextAlign from "@tiptap/extension-text-align";
+import { Color, TextStyle } from "@tiptap/extension-text-style";
+import { EditorContent, generateJSON, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import { useContext, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import ShareFileDialog from "./ShareFileDialoag";
+import EditFileDialog from "./EditFileDialog";
+import { Button } from "./ui/button";
+import { Printer } from "lucide-react";
+import { addDocument, syncData } from "@/service/IndexDb";
+
 const Editor = () => {
-    const { theme } = useContext(ThemeContext);
-    const { user, loading, setLoading } = useContext(UserContext);
-    const navigate = useNavigate();
-    const quillRef = useRef(null);
-    const id = useParams();
-    const { toast } = useToast();
-    const [fileInfo, setFileInfo] = useState();
-    const [content, setContent] = useState('');
-    const [title, setTitle] = useState(fileInfo?.title);
+  const { theme } = useContext(ThemeContext);
+  const { user, loading: userLoading } = useContext(UserContext);
+  const { toast } = useToast();
 
-    const modules = {
-        toolbar: [
-          [{ font: [] }], // Font family
-          [{ size: ['small', false, 'large', 'huge'] }], // Font size
-          ['bold', 'italic', 'underline'], // Bold, italic, underline
-          [{ color: [] }, { background: [] }], // Font color and background color
-          [{ align: [] }], // Text alignment
-          ['clean'], // Clear formatting
-        //   ["link", "image"],
-        ],
+  const navigate = useNavigate();
+  const { id } = useParams();
+
+  const [fileInfo, setFileInfo] = useState(null);
+  const [title, setTitle] = useState("");
+  const [docContent, setDocContent] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      TextStyle,
+      Color,
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
+      }),
+    ],
+    onUpdate({ editor }) {
+      if (!id || !user) return;
+      socket.emit("text-changes", {
+        content: editor.getJSON(),
+        sender: user.email,
+      }, id);
+    },
+  });
+  const normalizeContent = (content) => {
+    // already ProseMirror JSON
+    if (typeof content === "object" && content?.type === "doc") {
+      return content;
+    }
+
+    // legacy HTML (React-Quill)
+    if (typeof content === "string") {
+      return generateJSON(content, [
+        StarterKit,
+        TextStyle,
+        Color,
+        TextAlign,
+      ]);
+    }
+
+    // fallback empty doc
+    return {
+      type: "doc",
+      content: [{ type: "paragraph" }],
     };
+  };
 
-    const formats = [
-        'font', 'size', 'header',
-        'bold', 'italic', 'underline', 'strike',
-        'blockquote', 'code-block',
-        'list', 'bullet',
-        'script', 'indent', 'direction',
-        'align',
-        'color', 'background',
-        'link', 'image', 'video', 'formula',
-        'clean'
-    ];
+  // --- Fetch document from server ---
+  const getContent = async () => {
+    const response = await apiClient.post("/document/documentData", {
+      file_id: id,
+    });
+
+    const { title, content } = response.data;
+
+    setFileInfo(response.data);
+    setTitle(title);
+
+    // normalize old HTML → JSON
+    const normalized = normalizeContent(content);
+    setDocContent(normalized);
+  };
 
 
-    const handleChange = (content, delta, source, editor) => {
-        if (source === "user") {
-            setContent(content);
-            socket.emit('text-changes', delta, id.id);
-        }
-    };
+  // --- Sync + fetch lifecycle ---
+  useEffect(() => {
+    if (!user || !id) return;
 
-    const insertDelta = (delta) => {
-        if (quillRef.current && quillRef.current.getEditor) {
-            const quill = quillRef.current.getEditor();
-            quill.updateContents(delta);
-        } else {
-            console.error("Quill instance is not available");
-        }
-    };
-
-    const getContent = async () => {
-        try {
-            const response = await apiClient.post('/document/documentData', {
-                file_id: id.id,
-            });
-            // console.log(response.data);
-            setFileInfo(response.data);
-            setContent(response.data.content);
-        } catch (error) {
-            // console.log(error);
-        }
-    };
-
-    const updateDocument = async () => {
-        try {
-            const response = await apiClient.post('/document/documentUpdate', {
-                file_id: id.id,
-                title,
-                newContent: content,
-            });
-            if (response.status === 200) {
-                toast({
-                    description: "Changes saved",
-                });
-                return;
-            }
-        } catch (error) {
-            console.error("API request failed, saving to IndexedDB:", error);
-            try {
-                await addDocument({
-                    _id: id.id,
-                    title: fileInfo?.title,
-                    newContent: content,
-                });
-                toast({
-                    description: "Changes saved offline",
-                });
-            } catch (dbError) {
-                console.error("Failed to save to IndexedDB:", dbError);
-            }
-        }
-    };
-
-    useEffect(() => {
-        const fetchData = async () => {
-            const syncSuccess = await syncData(id.id);
-            if (syncSuccess) {
-                await getContent();
-            } else {
-                console.error("Sync failed. Fetching content skipped.");
-            }
-        };
-
-        fetchData();
-    }, [user]);
-    useEffect(() => {
-        socket.emit('enter', user?.email, id.id);
-
-        socket.on('enter', async (email, code) => {
-            console.log(`User joined:`, email);
+    (async () => {
+      try {
+        setIsLoading(true);
+        // attempt offline sync
+        // always fetch fresh server state
+        await syncData(id);     
+        await getContent();     
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Could not load document",
         });
+        console.log(error)
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [user, id]);
 
-        socket.on('text-changes', async (delta) => {
-            // console.log(delta);
-            insertDelta(delta);
-        });
+  // --- Hydrate editor exactly once ---
+  useEffect(() => {
+    if (!editor || !docContent) return;
+    editor.commands.setContent(docContent, false);
+  }, [editor, docContent]);
 
-        socket.on('test', async () => {
-            console.log(`Test event fired`);
-        });
+  // --- Socket collaboration ---
+  useEffect(() => {
+    if (!editor || !user || !id) return;
 
-        return () => {
-            socket.off('enter');
-            socket.off('text-changes');
-            socket.off('test');
-        };
-    }, []);
-    if (loading) return <p>Loading...</p>;
-    if (!user) return <p>User not logged in</p>;
+    socket.emit("enter", user.email, id);
+
+    socket.on("text-changes", ({ content, sender }) => {
+      if (sender === user.email) return;
+      editor.commands.setContent(content, false);
+    });
+
+    return () => socket.off("text-changes");
+  }, [editor, user, id]);
+
+  // --- Save ---
+  const updateDocument = async () => {
+    if (!editor) return;
+
+    try {
+      await apiClient.post("/document/documentUpdate", {
+        file_id: id,
+        title,
+        newContent: editor.getJSON(),
+      });
+      toast({ description: "Changes saved" });
+    } catch {
+      await addDocument({
+        _id: id,
+        title,
+        newContent: editor.getJSON(),
+      });
+      toast({ description: "Saved offline" });
+    }
+  };
+
+  // --- Hard loading guards ---
+  if (userLoading || isLoading) {
     return (
-        <div>
-            <div className='nav flex justify-between'>
-                <div className='title flex font-semibold text-xl'>
-                    <div className='my-2'>
-                        {fileInfo ? fileInfo.title : `Title`}
-                    </div>
-                    <div className="editbtn text-sm mx-2 text-zinc-400 hover:text-zinc-700 cursor-pointer">
-                        <EditFileDialog fileInfo={fileInfo} setTitle={setTitle} />
-                    </div>
-                    <div className="editbtn text-sm cursor-pointer">
-                        <ShareFileDialog className='border-2 text-black hover:bg-black hover:text-white ' />
-                    </div>
-                    <div className="editbtn text-sm mx-2 cursor-pointer">
-                        <Button onClick={window.print} className={`${theme ? "text-black" : ""} hover:bg-black hover:text-white`} variant="outline"><Printer /></Button>
-                    </div>
-                </div>
-                <div className="title m-2 flex justify-end gap-3">
-                    <Button onClick={updateDocument} className={`${theme ? "text-black" : ""} hover:bg-black hover:text-white`} variant="outline">Save</Button>
-                    <Button onClick={() => navigate(`/home`)} className={`${theme ? "text-black" : ""} hover:bg-black hover:text-white`} variant="outline">Back</Button>
-                </div>
-            </div>
-            <ReactQuill
-                theme="snow"
-                className='editor'
-                value={content}
-                onChange={handleChange}
-                modules={modules}
-                formats={formats}
-                ref={quillRef}
-                placeholder="Start typing..."
-                style={{ height: '80vh' }}
-            />
-        </div>
+      <div className="h-screen flex items-center justify-center text-lg">
+        Syncing document…
+      </div>
     );
-};
+  }
 
-export default Editor;
+  if (!user) return <p>User not logged in</p>;
+
+  return (
+    <div>
+      <div className="nav flex justify-between">
+        <div className="title flex font-semibold text-xl">
+          <div className="my-2">{title || "Untitled"}</div>
+
+          <div className="mx-2 text-sm text-zinc-400 hover:text-zinc-700 cursor-pointer">
+            <EditFileDialog fileInfo={fileInfo} setTitle={setTitle} />
+          </div>
+
+          <ShareFileDialog />
+
+          <Button
+            onClick={window.print}
+            variant="outline"
+            className={`mx-2 ${theme ? "text-black" : ""}`}
+          >
+            <Printer />
+          </Button>
+        </div>
+
+        <div className="m-2 flex gap-3 text-secondary">
+          <Button onClick={updateDocument} variant="outline">
+            Save
+          </Button>
+          <Button onClick={() => navigate("/home")} variant="outline">
+            Back
+          </Button>
+        </div>
+      </div>
+
+      <EditorContent
+        editor={editor}
+        className="editor border rounded-md p-4"
+        style={{ minHeight: "80vh" }}
+      />
+    </div>
+  );
+};
+export default Editor

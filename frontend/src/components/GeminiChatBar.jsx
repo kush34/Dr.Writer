@@ -21,13 +21,13 @@ import { Label } from "@/components/ui/label"
 import apiClient from "@/service/axiosConfig";
 import { ThemeContext } from "@/context/ThemeContext";
 import Markdown from "react-markdown";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export function GeminiChatBar({ documentId }) {
     const { user, loading } = useContext(UserContext);
+    const { toast } = useToast();
     const { theme } = useContext(ThemeContext);
-    if (loading) return <p>Loading...</p>;
-    if (!user) return <p>User not logged in</p>;
+
     const [prompt, setPrompt] = useState('');
     const [geminiLoading, setGeminiLoading] = useState(false);
     const [responseList, setResponseList] = useState([]);
@@ -36,9 +36,15 @@ export function GeminiChatBar({ documentId }) {
         try {
             const response = await apiClient.get(`document/getChats/${documentId}`)
             console.log(response.data)
-            setResponseList(response.data)
+            if(response.status === 200){
+                setResponseList(response.data)
+            }
         } catch (error) {
-            toast('Could not get Chats')
+            toast({
+                title: "Error",
+                description: "Could not Document LLM Chats",
+            });
+
             console.log('Fetching chats from GET document/getChats/:documentId ', error)
         }
     }
@@ -119,7 +125,11 @@ export function GeminiChatBar({ documentId }) {
             }
         } catch (err) {
             console.error(err);
-            toast("Streaming failed");
+            toast({
+                title: "Error",
+                description: "Streaming failed",
+            });
+
 
             // Rollback optimistic UI on failure
             setResponseList((prev) => prev.slice(0, -1));
@@ -130,8 +140,11 @@ export function GeminiChatBar({ documentId }) {
 
 
     useEffect(() => {
-        fetchChats();
-    }, [])
+        if (documentId) fetchChats();
+    }, [documentId]);
+
+    if (loading) return <p>Loading...</p>;
+    if (!user) return <p>User not logged in</p>;
     return (
         <Sidebar className={`${theme == 'dark' ? "bg-zinc-950" : ""} `}>
             <SidebarContent className={`${theme == 'dark' ? "bg-zinc-950" : ""}`}>
