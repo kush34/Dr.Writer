@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getAuth } from 'firebase/auth';
 import { useEffect, useRef } from "react";
-import { SendHorizontal } from 'lucide-react';
+import { Copy, SendHorizontal } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import React from "react";
 import { Plus } from 'lucide-react';
@@ -36,7 +36,7 @@ export function GeminiChatBar({ documentId }) {
         try {
             const response = await apiClient.get(`document/getChats/${documentId}`)
             console.log(response.data)
-            if(response.status === 200){
+            if (response.status === 200) {
                 setResponseList(response.data)
             }
         } catch (error) {
@@ -138,10 +138,19 @@ export function GeminiChatBar({ documentId }) {
         }
     };
 
-
+    const copyPrompt = async (text)=>{
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (error) {
+             console.error(error);
+            toast({title:"Error",description:"Could not copy!"})
+        }
+    }
     useEffect(() => {
-        if (documentId) fetchChats();
-    }, [documentId]);
+        if(loading && !user) return;
+        if (!documentId) return;
+            fetchChats();
+    }, [documentId,loading,user]);
 
     if (loading) return <p>Loading...</p>;
     if (!user) return <p>User not logged in</p>;
@@ -169,6 +178,11 @@ export function GeminiChatBar({ documentId }) {
                                         <div className="bg-green-400 text-black rounded-md text-sm p-3 max-w-[80%] whitespace-pre-wrap">
                                             <Markdown>{item.response || "▍"}</Markdown>
                                         </div>
+                                    </div>
+                                    <div className="flex text-sm justify-end">
+                                        <button onClick={()=>copyPrompt(item.response)}>
+                                            <Copy size={12} />
+                                        </button>
                                     </div>
                                 </div>
                             ))

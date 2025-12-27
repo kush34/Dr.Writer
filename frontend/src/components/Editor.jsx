@@ -1,4 +1,5 @@
 import { ThemeContext } from "@/context/ThemeContext";
+import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { UserContext } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import apiClient from "@/service/axiosConfig";
@@ -28,23 +29,6 @@ const Editor = () => {
   const [docContent, setDocContent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      TextStyle,
-      Color,
-      TextAlign.configure({
-        types: ["heading", "paragraph"],
-      }),
-    ],
-    onUpdate({ editor }) {
-      if (!id || !user) return;
-      socket.emit("text-changes", {
-        content: editor.getJSON(),
-        sender: user.email,
-      }, id);
-    },
-  });
   const normalizeContent = (content) => {
     // already ProseMirror JSON
     if (typeof content === "object" && content?.type === "doc") {
@@ -84,52 +68,7 @@ const Editor = () => {
     setDocContent(normalized);
   };
 
-
-  // --- Sync + fetch lifecycle ---
-  useEffect(() => {
-    if (!user || !id) return;
-
-    (async () => {
-      try {
-        setIsLoading(true);
-        // attempt offline sync
-        // always fetch fresh server state
-        await syncData(id);     
-        await getContent();     
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Could not load document",
-        });
-        console.log(error)
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, [user, id]);
-
-  // --- Hydrate editor exactly once ---
-  useEffect(() => {
-    if (!editor || !docContent) return;
-    editor.commands.setContent(docContent, false);
-  }, [editor, docContent]);
-
-  // --- Socket collaboration ---
-  useEffect(() => {
-    if (!editor || !user || !id) return;
-
-    socket.emit("enter", user.email, id);
-
-    socket.on("text-changes", ({ content, sender }) => {
-      if (sender === user.email) return;
-      editor.commands.setContent(content, false);
-    });
-
-    return () => socket.off("text-changes");
-  }, [editor, user, id]);
-
-  // --- Save ---
-  const updateDocument = async () => {
+  const updateDocument = async (editor) => {
     if (!editor) return;
 
     try {
@@ -149,6 +88,29 @@ const Editor = () => {
     }
   };
 
+  // --- Sync + fetch lifecycle ---
+  useEffect(() => {
+    if (!user || !id) return;
+
+    (async () => {
+      try {
+        setIsLoading(true);
+        // attempt offline sync
+        // always fetch fresh server state
+        await syncData(id);
+        await getContent();
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Could not load document",
+        });
+        console.log(error)
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [user, id]);
+
   // --- Hard loading guards ---
   if (userLoading || isLoading) {
     return (
@@ -162,39 +124,10 @@ const Editor = () => {
 
   return (
     <div>
-      <div className="nav flex justify-between">
-        <div className="title flex font-semibold text-xl">
-          <div className="my-2">{title || "Untitled"}</div>
-
-          <div className="mx-2 text-sm text-zinc-400 hover:text-zinc-700 cursor-pointer">
-            <EditFileDialog fileInfo={fileInfo} setTitle={setTitle} />
-          </div>
-
-          <ShareFileDialog />
-
-          <Button
-            onClick={window.print}
-            variant="outline"
-            className={`mx-2 ${theme ? "text-black" : ""}`}
-          >
-            <Printer />
-          </Button>
-        </div>
-
-        <div className="m-2 flex gap-3 text-secondary">
-          <Button onClick={updateDocument} variant="outline">
-            Save
-          </Button>
-          <Button onClick={() => navigate("/home")} variant="outline">
-            Back
-          </Button>
-        </div>
-      </div>
-
-      <EditorContent
-        editor={editor}
-        className="editor border rounded-md p-4"
-        style={{ minHeight: "80vh" }}
+      <SimpleEditor
+        content={docContent}
+        updateDocument={updateDocument}
+        className="my-tiptap-ui"
       />
     </div>
   );
