@@ -163,14 +163,14 @@ const MobileToolbarContent = ({
   </>
 )
 
-export function SimpleEditor({ content, updateDocument }) {
+export function SimpleEditor({ content, onEditorReady, updateDocument }) {
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()
   const { user, loading: userLoading } = useContext(UserContext);
   const [mobileView, setMobileView] = useState("main")
   const toolbarRef = useRef(null)
   const navigate = useNavigate();
-    const { id } = useParams();
+  const { id } = useParams();
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -223,6 +223,11 @@ export function SimpleEditor({ content, updateDocument }) {
       setMobileView("main")
     }
   }, [isMobile, mobileView])
+  useEffect(() => {
+    if (editor && onEditorReady) {
+      setTimeout(() => onEditorReady(editor), 0);
+    }
+  }, [editor]);
   useEffect(() => {
     if (!editor || !content) return;
     editor.commands.setContent(content, false);

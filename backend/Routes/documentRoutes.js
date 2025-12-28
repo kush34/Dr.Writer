@@ -6,9 +6,11 @@ import User from '../Models/userModel.js';
 import Document from '../Models/documentModel.js'
 import fs from 'fs';
 import mammoth from 'mammoth';
-import useGemini, { useGeminiStream } from '../service/gemini.js'
+import useGemini, { getEditOperations, useGeminiStream } from '../service/gemini.js'
 import rateLimit from 'express-rate-limit';
 import Chat from '../Models/chatModel.js';
+import { applyEdits } from '../utils/applyEdits.js';
+import { sanitizeOperations } from '../utils/llmActions.js';
 
 const geminiLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -59,7 +61,7 @@ router.get('/documentList', firebaseTokenVerify, async (req, res) => {
     if (user_id) {
       const documentList = await Document.find({ user_id }).select("title createdAt");
       if (documentList) {
-        res.status(200).send({documents:documentList});
+        res.status(200).send({ documents: documentList });
       } else {
         res.status(404).send("no documents found");
       }
@@ -161,6 +163,52 @@ router.post("/adduser", firebaseTokenVerify, async (req, res) => {
 
 });
 
+
+//perform operations on document 
+router.post(
+  "/actions/:documentId",
+  firebaseTokenVerify,
+  async (req, res) => {
+    try {
+      const { documentId } = req.params
+      const { command } = req.body
+      const user_id = req.user_id
+
+      const dbDocument = await Document.findById(documentId)
+
+      console.log(dbDocument.user_id, user_id);
+      if (!dbDocument || dbDocument.user_id.toString() !== user_id.toString()) {
+        return res.status(404).json({ message: "Document not found" })
+      }
+
+      const llmResponse = await getEditOperations(
+        dbDocument.content,
+        command
+      )
+      console.log(llmResponse)
+      const safeOps = sanitizeOperations(llmResponse.operations);
+
+      if (safeOps.length === 0) {
+        return res.status(400).json({
+          error: "LLM returned no valid operations"
+        });
+      }
+      const updated = applyEdits(
+        dbDocument.content,
+        safeOps
+      )
+
+      res.json({
+        updatedContent: updated,
+        operations: llmResponse.operations
+      })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: "LLM edit failed" })
+    }
+  }
+)
+
 // Gemini user Prompt response endpoint
 router.post(
   "/userprompt",
@@ -177,7 +225,7 @@ router.post(
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-    res.flushHeaders?.(); 
+    res.flushHeaders?.();
 
     let fullResponse = "";
 
@@ -244,7 +292,7 @@ router.post("/syncDocument", firebaseTokenVerify, async (req, res) => {
     // If user is not authorized, send a 403 response
     return res.status(403).send("You are not authorized to access this document");
   } catch (error) {
-    res.status(500).send({message:"Something went wrong!"})
+    res.status(500).send({ message: "Something went wrong!" })
     console.log(error);
   }
 });
@@ -280,14 +328,17 @@ router.post("/fileUpload", firebaseTokenVerify, upload.single("file"), async (re
 
 
 //get gemeni chats by documentId
-router.get('/getChats/:documentId',firebaseTokenVerify,async (req,res)=>{
+router.get('/getChats/:documentId', firebaseTokenVerify, async (req, res) => {
   try {
-    const {documentId} = req.params;
-    const getChats = await Chat.find({documentId})
-    res.send({documentChat:getChats})
+    const { documentId } = req.params;
+    const getChats = await Chat.find({ documentId })
+    res.send({ documentChat: getChats })
   } catch (error) {
-    res.send({error:"Could not retreive your chats",info:"/document/getChats/:documentId ENDPOINT"})
+    res.send({ error: "Could not retreive your chats", info: "/document/getChats/:documentId ENDPOINT" })
     console.log(error);
   }
 })
+
+
+
 export default router;

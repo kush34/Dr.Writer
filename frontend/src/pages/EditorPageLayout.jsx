@@ -11,7 +11,10 @@ const Layout = ({ children }) => {
   return (
     <div className={`flex min-h-screen ${theme === 'dark' ? "bg-zinc-900" : "bg-zinc-100"}`}>
       <SidebarProvider>
-        <GeminiChatBar documentId={id} className="geminichatbar flex-shrink-0" />
+        <GeminiChatBar
+          className="geminichatbar flex-shrink-0"
+          documentId={id}
+        />
         <main className="flex-1 overflow-x-auto">
           <SidebarTrigger className="trigger" />
           <div className="w-full">{children}</div>

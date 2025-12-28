@@ -1,23 +1,24 @@
-import React, { useContext, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom';
-import { UserContextProvider } from '@/context/UserContext';
-import EditorPageLayout from './EditorPageLayout'
-import Editor from '../components/Editor';
-import './printer.css'
+
+import React, { useState } from "react";
+import { UserContextProvider } from "@/context/UserContext";
+import EditorPageLayout from "./EditorPageLayout";
+import Editor from "@/components/Editor";
+import { SharedEditorContext } from "@/context/EditorContext";
 
 const EditorPage = () => {
+  const [editorInstance, setEditorInstance] = useState(null);
 
   return (
-    <UserContextProvider>
-      <EditorPageLayout>
-        <div>
-            <div id="editor" className='m-8 '>
-                <Editor/>
-            </div>
-        </div>
-      </EditorPageLayout>
-    </UserContextProvider>
-  )
-}
+    <SharedEditorContext.Provider value={{ editor: editorInstance, setEditor: setEditorInstance }}>
+      <UserContextProvider>
+        <EditorPageLayout>
+          <div id="editor" className="m-8">
+            <Editor onEditorReady={setEditorInstance} />
+          </div>
+        </EditorPageLayout>
+      </UserContextProvider>
+    </SharedEditorContext.Provider>
+  );
+};
 
-export default EditorPage
+export default EditorPage;
