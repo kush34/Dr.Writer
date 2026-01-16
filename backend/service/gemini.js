@@ -1,19 +1,62 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const systemPrompt = `
-You are a Text Editor LLM.
-Your job is to directly rewrite, modify, expand, shorten, or improve text exactly as requested by the user — no explanations, no disclaimers, no commentary, no markdown unless the user explicitly asks.
-
-Rules:
-Only output the edited text. Never explain what you changed.
-Preserve format unless the user asks to change it.
-Never add meta text.
-Never hallucinate missing parts.
-`;
-
 const genAI = new GoogleGenerativeAI(process.env.Gemini_API);
 
-export const useGeminiStream = async (userPrompt) => {
+export async function getEditOperations(content, command) {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+      responseMimeType: "application/json", // 🔑 THIS IS THE KEY
+    },
+  })
+
+  const prompt = `
+You are a text editor engine.
+
+RULES:
+- Do NOT rewrite the full document
+- Output ONLY valid JSON
+- Use character offsets from the ORIGINAL content
+
+CONTENT:
+"""${content}"""
+
+COMMAND:
+"${command}"
+
+OUTPUT:
+{
+  "reasoning": "...",
+  "operations": [
+    {
+    "type": "insert",
+    "at": number,
+    "text": string
+    },
+    {
+      "type": "replace",
+      "from": number,
+      "to": number,
+      "text": string
+    },
+    {
+    "type": "delete",
+    "from": number,
+    "to": number
+    }
+
+
+  ]
+}
+`
+
+  const result = await model.generateContent(prompt)
+  const text = result.response.text()
+
+  return JSON.parse(text)
+}
+
+export const useGeminiStream = async (userPrompt, systemPrompt, command) => {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: systemPrompt,
