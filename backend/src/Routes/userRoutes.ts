@@ -1,21 +1,21 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import admin from 'firebase-admin';
-import User from '../Models/userModel.js'
+import User from '../Models/userModel'
 const router = express.Router();
 
-router.get("/", (req, res) => {
+router.get("/", (req: Request, res: Response) => {
   res.send('hello from backend ....')
 });
 
-router.post("/firebaseTokenVerify", async (req,res)=>{
+router.post("/firebaseTokenVerify", async (req: Request, res: Response) => {
   const idToken = req.body.token;
   // console.log(idToken)
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     // console.log(decodedToken)
-    const user = await User.findOne({email:decodedToken.email});
+    const user = await User.findOne({ email: decodedToken.email });
     // console.log(user);
-    if(!user){
+    if (!user) {
       console.log(`user not found...`)
       const newUser = await User.create({
         name: decodedToken.name,

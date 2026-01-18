@@ -1,11 +1,11 @@
 import express from "express";
 import 'dotenv/config'
-import connectDB from './Config/database.js'
+import connectDB from './Config/database'
 import cors from "cors";
 import { Server } from "socket.io";
 import http from 'http';
-import userRoutes from './Routes/userRoutes.js';
-import documentRoutes from './Routes/documentRoutes.js';
+import userRoutes from './Routes/userRoutes';
+import documentRoutes from './Routes/documentRoutes';
 import rateLimit from 'express-rate-limit'
 //Connection to the database
 connectDB();
