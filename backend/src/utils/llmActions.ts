@@ -14,10 +14,30 @@
  * No markdown. No backticks. No prose.
  */
 
+import { NumberLiteralType } from "typescript";
+
 /**
  * Validate a single edit operation
  */
-export function isValidOp(op) {
+
+type tReplace = {
+  type: "replace"
+  from: number;
+  to: number;
+  text: string
+}
+type tInsert = {
+  type: "insert"
+  at: number;
+  text: string
+}
+type tDelete = {
+  type: "delete"
+  from: number
+  to: number
+}
+export type tOps = tReplace | tInsert | tDelete
+export function isValidOp(op: tOps) {
   if (!op || typeof op !== "object") return false;
 
   switch (op.type) {
@@ -54,7 +74,7 @@ export function isValidOp(op) {
  * Validate + sanitize LLM response
  * Drops invalid ops instead of crashing your app
  */
-export function sanitizeOperations(ops) {
+export function sanitizeOperations(ops:tOps[]) {
   if (!Array.isArray(ops)) return [];
 
   return ops.filter(isValidOp);

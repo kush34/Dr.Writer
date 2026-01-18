@@ -1,16 +1,16 @@
-import express from 'express';
-import firebaseTokenVerify from '../Middlewares/firebaseTokenVerify.js';
-import upload from "../service/multer.js";
+import express, { Request, Response } from "express"
+import firebaseTokenVerify from '../Middlewares/firebaseTokenVerify';
+import upload from "../service/multer";
 const router = express.Router();
-import User from '../Models/userModel.js';
-import Document from '../Models/documentModel.js'
+import User from '../Models/userModel';
+import Document from '../Models/documentModel'
 import fs from 'fs';
 import mammoth from 'mammoth';
-import useGemini, { getEditOperations, useGeminiStream } from '../service/gemini.js'
+import { getEditOperations, useGeminiStream } from '../service/gemini'
 import rateLimit from 'express-rate-limit';
-import Chat from '../Models/chatModel.js';
-import { applyEdits } from '../utils/applyEdits.js';
-import { sanitizeOperations } from '../utils/llmActions.js';
+import Chat from '../Models/chatModel';
+import { applyEdits } from '../utils/applyEdits';
+import { sanitizeOperations } from '../utils/llmActions';
 
 const geminiLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -20,7 +20,7 @@ const geminiLimiter = rateLimit({
   message: "reached your limit... pls try again later"
 })
 
-router.get("/getDoc", async (req, res) => {
+router.get("/getDoc", async (req: Request, res: Response) => {
   try {
     const docDb = await Document.findOne({ _id: process.env.testFile });
     if (!docDb) {
@@ -34,7 +34,7 @@ router.get("/getDoc", async (req, res) => {
   }
 })
 //creates new document on user request
-router.post('/createDocument', firebaseTokenVerify, async (req, res) => {
+router.post('/createDocument', firebaseTokenVerify, async (req: Request, res: Response) => {
   try {
     console.log(`new doc request...`)
     const user_id = req.user_id;
@@ -54,7 +54,7 @@ router.post('/createDocument', firebaseTokenVerify, async (req, res) => {
 })
 
 //gets all the document list for home page display
-router.get('/documentList', firebaseTokenVerify, async (req, res) => {
+router.get('/documentList', firebaseTokenVerify, async (req: Request, res: Response) => {
   try {
     // console.log(`document list request...`)
     const user_id = req.user_id;
@@ -75,7 +75,7 @@ router.get('/documentList', firebaseTokenVerify, async (req, res) => {
 })
 
 //get the document data for editor page
-router.post("/documentData", firebaseTokenVerify, async (req, res) => {
+router.post("/documentData", firebaseTokenVerify, async (req: Request, res: Response) => {
   try {
     const user_id = req.user_id;
     const file_id = req.body.file_id;
@@ -85,6 +85,9 @@ router.post("/documentData", firebaseTokenVerify, async (req, res) => {
     }
 
     const document = await Document.findOne({ _id: file_id });
+    if (!document || !document.user_id) {
+      return res.status(404).send("Document not found");
+    }
     console.log(`user_id:${user_id}, document user_id:${document.user_id}`)
     // If document is not found, return a 404 response
     if (!document) {
@@ -105,7 +108,7 @@ router.post("/documentData", firebaseTokenVerify, async (req, res) => {
 });
 
 //save the changes made into content title of the document
-router.post('/documentUpdate', firebaseTokenVerify, async (req, res) => {
+router.post('/documentUpdate', firebaseTokenVerify, async (req: Request, res: Response) => {
   try {
     const user_id = req.user_id;
     const file_id = req.body.file_id;
@@ -131,7 +134,7 @@ router.post('/documentUpdate', firebaseTokenVerify, async (req, res) => {
 })
 
 //add users to read a document other than owner
-router.post("/adduser", firebaseTokenVerify, async (req, res) => {
+router.post("/adduser", firebaseTokenVerify, async (req: Request, res: Response) => {
   try {
     const user_id = req.user_id;
     const file_id = req.body.file_id;
@@ -142,7 +145,7 @@ router.post("/adduser", firebaseTokenVerify, async (req, res) => {
       const userToAdd = await User.findOne({ email: userToAddMail });
       // console.log(userToAdd._id);
       if (!userToAdd) {
-        res.status(404).send('user cannot be added...');
+        return res.status(404).send('user cannot be added...');
       }
 
       const document = await Document.findOneAndUpdate(
@@ -168,13 +171,16 @@ router.post("/adduser", firebaseTokenVerify, async (req, res) => {
 router.post(
   "/actions/:documentId",
   firebaseTokenVerify,
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     try {
       const { documentId } = req.params
       const { command } = req.body
       const user_id = req.user_id
+      if (!user_id) return res.status(400).send({ message: "Pls login to access this endpoint." })
 
       const dbDocument = await Document.findById(documentId)
+
+      if (!dbDocument || !dbDocument.user_id) return res.status(404).send({ message: "Could not find the requested Document" })
 
       console.log(dbDocument.user_id, user_id);
       if (!dbDocument || dbDocument.user_id.toString() !== user_id.toString()) {
@@ -214,7 +220,7 @@ router.post(
   "/userprompt",
   geminiLimiter,
   firebaseTokenVerify,
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     const { userPrompt, documentId } = req.body;
     const user_id = req.user_id;
 
@@ -230,7 +236,7 @@ router.post(
     let fullResponse = "";
 
     try {
-      const result = await useGeminiStream(userPrompt);
+      const result = await useGeminiStream(userPrompt, "", "");
 
       for await (const chunk of result.stream) {
         const text =
@@ -266,12 +272,15 @@ router.post(
 
 
 //sync the offline file changes made by user 
-router.post("/syncDocument", firebaseTokenVerify, async (req, res) => {
+router.post("/syncDocument", firebaseTokenVerify, async (req: Request, res: Response) => {
   try {
     const user_id = req.user_id;
     const { file_id, title, newContent } = req.body;
     const document = await Document.findOne({ _id: file_id });
-    if (!document) {
+    if (!user_id) {
+      return res.status(404).send('Pls Login to access this route.');
+    }
+    if (!document || !document.user_id) {
       return res.status(404).send('document not found...');
     }
     if (!file_id || !title || !newContent) {
@@ -298,7 +307,7 @@ router.post("/syncDocument", firebaseTokenVerify, async (req, res) => {
 });
 
 //handles file upload 
-router.post("/fileUpload", firebaseTokenVerify, upload.single("file"), async (req, res) => {
+router.post("/fileUpload", firebaseTokenVerify, upload.single("file"), async (req: Request, res: Response) => {
   try {
     const user_id = req.user_id;
     if (user_id) {
@@ -328,7 +337,7 @@ router.post("/fileUpload", firebaseTokenVerify, upload.single("file"), async (re
 
 
 //get gemeni chats by documentId
-router.get('/getChats/:documentId', firebaseTokenVerify, async (req, res) => {
+router.get('/getChats/:documentId', firebaseTokenVerify, async (req: Request, res: Response) => {
   try {
     const { documentId } = req.params;
     const getChats = await Chat.find({ documentId })

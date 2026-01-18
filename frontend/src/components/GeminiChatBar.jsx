@@ -9,13 +9,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getChatsForDocument } from "@/service/document";
 import { useSharedEditor } from "@/context/EditorContext";
 import apiClient from "@/service/axiosConfig";
+import { getAuth } from "firebase/auth";
 
 export function GeminiChatBar({ documentId }) {
   const { user, loading } = useContext(UserContext);
   const { toast } = useToast();
   const { theme } = useContext(ThemeContext);
   const { editor } = useSharedEditor();
-
+  const auth = getAuth();
   const [prompt, setPrompt] = useState('');
   const [geminiLoading, setGeminiLoading] = useState(false);
   const [actionMode, setActionMode] = useState(false);
@@ -52,10 +53,13 @@ export function GeminiChatBar({ documentId }) {
       documentChat: [...(old?.documentChat ?? []), { prompt: currentPrompt, response: "", streaming: true }]
     }));
 
+    const user = auth.currentUser;
+    const token = await user.getIdToken();
+
     try {
       const res = await fetch(`${import.meta.env.VITE_Backend_URL}/document/userprompt`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json","Authorization":`Bearer ${token}` },
         body: JSON.stringify({ userPrompt: currentPrompt, documentId })
       });
       if (!res.ok || !res.body) throw new Error("Stream not available");

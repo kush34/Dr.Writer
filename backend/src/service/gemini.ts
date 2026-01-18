@@ -1,8 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { error } from "console";
 
-const genAI = new GoogleGenerativeAI(process.env.Gemini_API);
+const GEMINI_API_KEY = process.env.Gemini_API;
+if(!GEMINI_API_KEY){
+  throw new error("Gemini_API not found in env.")
+}
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-export async function getEditOperations(content, command) {
+export async function getEditOperations(content: Object, command: string) {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     generationConfig: {
@@ -56,7 +61,7 @@ OUTPUT:
   return JSON.parse(text)
 }
 
-export const useGeminiStream = async (userPrompt, systemPrompt, command) => {
+export const useGeminiStream = async (userPrompt: string, systemPrompt: string, command: string) => {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: systemPrompt,
