@@ -4,7 +4,7 @@ import ReactDOM from "react-dom/client";
 import App from './App'
 import { BrowserRouter, Routes, Route, Outlet } from "react-router";
 import Home from './pages/Home';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 import EditorPage from './pages/EditorPage';
 import Landing from '@/pages/Landing'
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -24,14 +24,14 @@ const queryClient = new QueryClient({
 
 function ThemedRoutes() {
   return (
-    <ThemeProvider>
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <UserContextProvider>
         <Outlet />
       </UserContextProvider>
     </ThemeProvider>
   );
 }
-if(root){
+if (root) {
 
   ReactDOM.createRoot(root).render(
     <QueryClientProvider client={queryClient}>

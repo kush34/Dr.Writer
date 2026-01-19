@@ -10,8 +10,6 @@ import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { DocumentDTO } from "@/types";
-import { Button } from "./ui/button";
-import { Save, Undo2 } from "lucide-react";
 
 const normalizeContent = (content: any): JSONContent => {
   if (typeof content === "object" && content?.type === "doc") return content;
