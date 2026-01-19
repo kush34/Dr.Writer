@@ -3,19 +3,19 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 
 type tUser = {
-    displayName:string | null
-    email:string | null
-    photoURL:string | null
-    emailVerified:boolean
+    displayName: string | null
+    email: string | null
+    photoURL: string | null
+    emailVerified: boolean
 }
 type tUserContext = {
-    user:tUser | null
+    user: tUser | null
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
-    loading:boolean
+    loading: boolean
 }
 const UserContext = createContext<tUserContext | null>(null);
 
-const UserContextProvider = ({ children }:{ children : ReactNode}) => {
+const UserContextProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<tUser | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
 
@@ -47,4 +47,12 @@ const UserContextProvider = ({ children }:{ children : ReactNode}) => {
     );
 };
 
-export { UserContext, UserContextProvider };
+const useUser = () => {
+    const ctx = useContext(UserContext);
+    if (!ctx) {
+        throw new Error("useTheme must be used inside ThemeProvider");
+    }
+    return ctx;
+};
+
+export { UserContext, UserContextProvider, useUser };

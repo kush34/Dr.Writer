@@ -43,21 +43,21 @@ const items = [
     url: "#",
     icon: Home,
   },
-  // {
-  //   title: "Inbox",
-  //   url: "#",
-  //   icon: Inbox,
-  // },
-  // {
-  //   title: "Calendar",
-  //   url: "#",
-  //   icon: Calendar,
-  // },
-  // {
-  //   title: "Search",
-  //   url: "#",
-  //   icon: Search,
-  // },
+  {
+    title: "Inbox",
+    url: "#",
+    icon: Inbox,
+  },
+  {
+    title: "Calendar",
+    url: "#",
+    icon: Calendar,
+  },
+  {
+    title: "Search",
+    url: "#",
+    icon: Search,
+  },
   {
     title: "Settings",
     url: "#",
@@ -90,9 +90,9 @@ export function AppSidebar() {
   }
   return (
     <Sidebar>
-      <SidebarContent className={` !border-none`}>
+      <SidebarContent className={`border-none!`}>
         <SidebarGroup>
-          <SidebarGroupLabel>Dr. Writer</SidebarGroupLabel>
+          <SidebarGroupLabel className="my-5 text-xl">Dr. Writer</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
@@ -110,7 +110,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className={` !border-none overflow-visible`}>
+      <SidebarFooter className={`!border-none overflow-visible`}>
         <SidebarContent className="!p-2 !bg-transparent">
           <SidebarGroupContent className="p-0">
             <ThemeToggleBtn />
@@ -140,7 +140,7 @@ export function AppSidebar() {
                   side="top"
                   align="end"
                   sideOffset={8}
-                  className={`${theme === "dark" ? "bg-zinc-950 text-white" : "bg-white text-black"} z-50 rounded-md shadow-lg w-56`}
+                  className={`z-50 rounded-md shadow-lg w-56`}
                 >
                   <DropdownMenuItem>
                     <span>Account</span>
