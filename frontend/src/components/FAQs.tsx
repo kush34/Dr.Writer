@@ -1,9 +1,12 @@
 import { ArrowDown, ChevronDown, X } from "lucide-react";
 import { useState } from "react"
 
+type Props = {
+    faqRef: React.RefObject<HTMLDivElement>;
+};
 
-const FAQs = ({faqRef}) => {
-    const [currentIdx, setCurrentIdx] = useState(null);
+const FAQs = ({ faqRef }: Props) => {
+    const [currentIdx, setCurrentIdx] = useState<number | null>(null);
     const faqs = [
         {
             title: "What is Dr.Writer ?",
