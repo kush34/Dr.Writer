@@ -19,7 +19,7 @@ import {
   DropdownMenuPortal,
 } from "@radix-ui/react-dropdown-menu";
 
-import ThemeToggleBtn from './ThemeToggleBtn'
+import { ModeToggle } from '@/components/ThemeToggleBtn'
 import {
   Sidebar,
   SidebarContent,
@@ -32,10 +32,9 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 
-import { useContext, useEffect } from "react";
-import { UserContext } from "../context/UserContext";
-import { ThemeContext } from "@/context/ThemeContext";
-import { Router, useNavigate } from "react-router-dom";
+import { useUser } from "@/context/UserContext";
+import { useNavigate } from "react-router-dom";
+import { useTheme } from "next-themes";
 // Menu items.
 const items = [
   {
@@ -66,16 +65,8 @@ const items = [
 ];
 
 export function AppSidebar() {
-  const themeCtx = useContext(ThemeContext);
-  if (!themeCtx) {
-    throw new Error("ThemeContext.Provider is missing");
-  }
-  const { theme } = themeCtx;
-  const userCtx = useContext(UserContext);
-  if (!userCtx) {
-    throw new Error("UserContext.Provider is missing");
-  }
-  const { user, loading } = userCtx;
+  const { theme } = useTheme();
+  const { user, loading } = useUser();
   const navigate = useNavigate();
   if (loading) return <p>Loading...</p>;
   if (!user) return <p>User not logged in</p>;
@@ -113,7 +104,7 @@ export function AppSidebar() {
       <SidebarFooter className={`!border-none overflow-visible`}>
         <SidebarContent className="!p-2 !bg-transparent">
           <SidebarGroupContent className="p-0">
-            <ThemeToggleBtn />
+            <ModeToggle />
           </SidebarGroupContent>
         </SidebarContent>
 

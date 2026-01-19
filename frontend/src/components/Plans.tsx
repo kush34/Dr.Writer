@@ -46,7 +46,7 @@ const Plans = ({ pricingRef }: Props) => {
   ];
 
   return (
-    <div ref={pricingRef} className="py-10 text-secondary flex flex-col gap-12 items-center">
+    <div ref={pricingRef} className="py-10 flex flex-col gap-12 items-center">
       <h1 className="text-4xl font-medium">Our Plans</h1>
 
       <div className="flex flex-col items-stretch gap-6 xl:gap-12 xl:flex-row">

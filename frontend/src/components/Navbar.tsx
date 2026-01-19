@@ -21,7 +21,7 @@ const Navbar = ({ faqexecuteScroll, executeScroll }: navbarProps) => {
     }
   ]
   return (
-    <div className='fixed w-full flex justify-between backdrop-filter backdrop-blur-2xl border-b p-5 text-secondary'>
+    <div className='fixed w-full flex justify-between backdrop-filter backdrop-blur-2xl border-b p-5'>
       <div className='flex justify-between w-1/2'>
         <div className="brand font-bold">
           DrWriter
