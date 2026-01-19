@@ -8,7 +8,7 @@ import { StarterKit } from "@tiptap/starter-kit"
 import { Image } from "@tiptap/extension-image"
 import { TaskItem, TaskList } from "@tiptap/extension-list"
 import { TextAlign } from "@tiptap/extension-text-align"
-import { Typography } from "@tiptap/extension-typography"
+import { closeSingleQuote, Typography } from "@tiptap/extension-typography"
 import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
@@ -74,9 +74,10 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
 import content from "@/components/tiptap-templates/simple/data/content.json"
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { useUser } from "@/context/UserContext"
 import socket from "@/service/socket"
+import { Save, SaveIcon, Undo2 } from "lucide-react"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -195,6 +196,7 @@ type SimpleEditorProps = {
 
 export function SimpleEditor({ content, onEditorReady, updateDocument }: SimpleEditorProps) {
   const isMobile = useIsBreakpoint()
+  const navigate = useNavigate();
   const { id } = useParams();
   const { user, loading: userLoading } = useUser();
   const { height } = useWindowSize()
@@ -280,6 +282,20 @@ export function SimpleEditor({ content, onEditorReady, updateDocument }: SimpleE
   }, [editor, user, id]);
   return (
     <div className="simple-editor-wrapper">
+      <div className="m-2 flex gap-3">
+        <Button
+          onClick={() => {
+            if (!editor) return;
+            console.log('Saved fired')
+            updateDocument(editor)
+          }
+          }>
+          <SaveIcon />
+        </Button>
+        <Button onClick={() => navigate("/home")}>
+          <Undo2 />
+        </Button>
+      </div>
       <EditorContext.Provider value={{ editor }}>
         <Toolbar
           ref={toolbarRef}
