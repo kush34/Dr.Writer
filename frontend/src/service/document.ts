@@ -1,4 +1,5 @@
 import apiClient from "@/service/axiosConfig";
+import { JSONContent } from "@tiptap/core";
 
 export const fetchDocuments = async () => {
   const res = await apiClient.get("/document/documentList");
@@ -28,7 +29,7 @@ export const fetchDocumentData = async (id: string) => {
 type Props = {
   id: string
   title: string
-  content: string
+  content: JSONContent
 }
 export const updateDocumentApi = async ({ id, title, content }: Props) => {
   await apiClient.post("/document/documentUpdate", {

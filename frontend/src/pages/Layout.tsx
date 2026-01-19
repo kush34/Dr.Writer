@@ -1,28 +1,14 @@
-import { ReactNode, useContext } from "react";
-import { SidebarProvider, SidebarTrigger } from "../components/ui/sidebar";
-import { AppSidebar } from "@/components/App-sidebar";
-import { Toaster } from "@/components/ui/sonner"
-import { ThemeContext } from "@/context/ThemeContext";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/App-sidebar"
 
-const Layout = ({ children }: { children: ReactNode }) => {
-  const themeCtx = useContext(ThemeContext)
-  if (!themeCtx) {
-    throw new Error("ThemeContext.Provider is missing");
-  }
-  const { theme } = themeCtx;
-  return (
-    <div className={`flex ${theme == 'dark' ? "bg-zinc-900 text-white" : "bg-zinc-100 text-black"}`}>
-      <SidebarProvider>
-        <AppSidebar />
-        <main className="flex-1 p-4 ">
-          <SidebarTrigger />
-          {children}
-        </main>
-        <Toaster />
-      </SidebarProvider>
-    </div>
-
-  );
-};
-
-export default Layout;
+export default function Layout({ children }: { children: React.ReactNode }) {
+    return (
+        <SidebarProvider>
+            <AppSidebar />
+            <main className="w-full mx-auto">
+                <SidebarTrigger />
+                {children}
+            </main>
+        </SidebarProvider>
+    )
+}
