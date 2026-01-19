@@ -63,7 +63,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
   if (userLoading || isLoading) return <div className="h-screen flex items-center justify-center text-lg">Syncing document…</div>;
   if (!user) return <p>User not logged in</p>;
   if (error) return <p>Failed to load document</p>;
-  if(!data) return <p>No document data</p>;
+  if (!data) return <p>No document data</p>;
   return (
     <div className="Editor">
       <SimpleEditor content={data.content} onEditorReady={onEditorReady} updateDocument={updateDocument} />

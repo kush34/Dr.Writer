@@ -21,7 +21,7 @@ const Landing = () => {
         }
     }
     return (
-        <div className='w-full h-screen text-white relative'>
+        <div className='w-full h-screen relative'>
             <Navbar faqexecuteScroll={faqexecuteScroll} executeScroll={executeScroll} />
             <Hero executeScroll={executeScroll} />
             <Features />

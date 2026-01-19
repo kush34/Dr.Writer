@@ -2,8 +2,6 @@ import React, { useContext, useRef, useState } from "react";
 import Layout from "./Layout";
 import Files from "../components/Files";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { ThemeContext } from "@/context/ThemeContext";
 import {
   Dialog,
   DialogContent,
@@ -18,20 +16,20 @@ import { Label } from "@/components/ui/label";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createDocument, uploadDocument } from "@/service/document";
+import { toast } from "sonner";
 
 const Home = () => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [newTitle, setNewTitle] = useState<string>("New Document");
-  const hiddenFileInput = useRef(null);
+  const hiddenFileInput = useRef<HTMLInputElement | null>(null);
 
   // CREATE DOC
   const createMutation = useMutation({
     mutationFn: createDocument,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      toast({ description: "New document created" });
+      toast.success("Created Doc", { description: "New document created" });
     },
   });
 
@@ -40,7 +38,7 @@ const Home = () => {
     mutationFn: uploadDocument,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      toast({ description: "File uploaded successfully" });
+      toast.success("Success", { description: "File uploaded successfully" });
     },
   });
 
@@ -49,7 +47,7 @@ const Home = () => {
     createMutation.mutate(newTitle);
   };
 
-  const handleFileUpload = (e:React.FormEvent<HTMLFormElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -66,7 +64,7 @@ const Home = () => {
       <div className="flex justify-end mr-12">
         <Dialog>
           <DialogTrigger asChild>
-            <Button className="bg-green-400">Add</Button>
+            <Button className="bg-primary">Add</Button>
           </DialogTrigger>
 
           <DialogContent>
@@ -96,10 +94,13 @@ const Home = () => {
                 hidden
                 ref={hiddenFileInput}
                 accept=".doc,.docx"
-                onChange={handleFileUpload}
+                onChange={(e)=>handleFileUpload}
               />
 
-              <Button onClick={() => hiddenFileInput.current.click()}>
+              <Button onClick={() => {
+                if (hiddenFileInput && hiddenFileInput.current)
+                  hiddenFileInput.current.click()
+              }}>
                 Upload
               </Button>
             </DialogFooter>

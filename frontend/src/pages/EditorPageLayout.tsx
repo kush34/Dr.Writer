@@ -15,6 +15,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
         <SidebarTrigger />
         {children}
       </main>
+      <Toaster/>
     </SidebarProvider>
   );
 };

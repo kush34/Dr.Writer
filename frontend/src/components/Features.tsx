@@ -25,10 +25,10 @@ const Features = () => {
     ]
     return (
         <div className='my-10'>
-            <div className='text-4xl text-secondary font-medium flex justify-center'>
+            <div className='text-4xl font-medium flex justify-center'>
                 Features
             </div>
-            <div className="grid place-items-center text-secondary m-12">
+            <div className="grid place-items-center m-12">
                 <ul className="grid xl:grid-cols-2 gap-12 max-w-4xl">
                     {Features.map((feature,index) => {
                         return (

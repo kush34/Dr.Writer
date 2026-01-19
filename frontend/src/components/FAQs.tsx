@@ -27,7 +27,7 @@ const FAQs = ({ faqRef }: Props) => {
     ]
 
     return (
-        <div ref={faqRef} className="text-secondary flex flex-col justify-center items-center p-10 border ">
+        <div ref={faqRef} className="flex flex-col justify-center items-center p-10 border ">
             <div className="title font-medium text-2xl">
                 FAQs
             </div>
