@@ -11,14 +11,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { signOutUser } from "../firebaseAuth/firebaseConfig";
 
-import {
-  DropdownMenu,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuPortal,
-} from "@radix-ui/react-dropdown-menu";
-
 import { ModeToggle } from '@/components/ThemeToggleBtn'
 import {
   Sidebar,
@@ -35,6 +27,8 @@ import {
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuPortal, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "./ui/dropdown-menu";
+
 // Menu items.
 const items = [
   {
@@ -68,8 +62,6 @@ export function AppSidebar() {
   const { theme } = useTheme();
   const { user, loading } = useUser();
   const navigate = useNavigate();
-  if (loading) return <p>Loading...</p>;
-  if (!user) return <p>User not logged in</p>;
   // console.log(user.photoURL)
   const handleSignOut = async () => {
     try {
@@ -79,6 +71,9 @@ export function AppSidebar() {
 
     }
   }
+  if (loading) return <p>Loading...</p>;
+  if (!user) return <p>User not logged in</p>;
+
   return (
     <Sidebar>
       <SidebarContent className={`border-none!`}>
@@ -106,47 +101,78 @@ export function AppSidebar() {
           <SidebarGroupContent className="p-0">
             <ModeToggle />
           </SidebarGroupContent>
-        </SidebarContent>
-
-        <SidebarMenu>
-          <SidebarMenuItem>
+          <SidebarGroupContent className="p-0 flex items-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="w-full flex items-center gap-3 px-2 py-2">
-                  <Avatar className="w-8 h-8">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Avatar className="h-8 w-8 shrink-0">
                     <AvatarImage
                       src={user.photoURL || "https://github.com/shadcn.png"}
-                      className="w-8 h-8 object-cover rounded-full"
+                      alt={`Avatar of ${user.displayName ?? "user"}`}
                     />
-                    <AvatarFallback className="w-8 h-8">CN</AvatarFallback>
                   </Avatar>
-
-                  <span className="truncate">{user.email}</span>
-                  <ChevronUp className="ml-auto" />
-                </SidebarMenuButton>
+                    <span>{user.displayName}</span>
+                  <ChevronUp className="ml-auto h-4 w-4 opacity-70" />
+                </button>
               </DropdownMenuTrigger>
 
-              <DropdownMenuPortal>
-                <DropdownMenuContent
-                  side="top"
-                  align="end"
-                  sideOffset={8}
-                  className={`z-50 rounded-md shadow-lg w-56`}
-                >
+
+
+              <DropdownMenuContent className="w-56" align="start">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuGroup>
                   <DropdownMenuItem>
-                    <span>Account</span>
+                    Profile
+                    <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <span>Billing</span>
+                    Billing
+                    <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <span onClick={() => handleSignOut()}>Sign out</span>
+                    Settings
+                    <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
                   </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenuPortal>
+                  <DropdownMenuItem>
+                    Keyboard shortcuts
+                    <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem>Team</DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>Invite users</DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem>Email</DropdownMenuItem>
+                        <DropdownMenuItem>Message</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>More...</DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
+                  <DropdownMenuItem>
+                    New Team
+                    <DropdownMenuShortcut>⌘+T</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>GitHub</DropdownMenuItem>
+                <DropdownMenuItem>Support</DropdownMenuItem>
+                <DropdownMenuItem disabled>API</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  Log out
+                  <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
             </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarContent>
       </SidebarFooter>
     </Sidebar>
   );
