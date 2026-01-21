@@ -122,7 +122,7 @@ export function GeminiChatBar({ documentId }: { documentId: string }) {
           <SidebarGroupLabel className="text-xl font-semibold">Dr. Writer</SidebarGroupLabel>
         </SidebarGroup>
         <SidebarContent>
-          <div className="overflow-y-scroll no-scrollbar p-1 flex flex-col gap-2">
+          <div className="overflow-y-scroll no-scrollbar p-3 flex flex-col gap-2">
             {data?.documentChat?.length === 0 ? (
               <div className="px-4 text-zinc-500">Enter prompt for Gemini response</div>
             ) : (

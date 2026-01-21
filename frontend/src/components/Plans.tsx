@@ -53,7 +53,7 @@ const Plans = ({ pricingRef }: Props) => {
         {plans.map((plan) => (
           <div
             key={plan.title}
-            className="flex flex-col justify-between border p-10 rounded-2xl w-80 h-[520px] shadow"
+            className={`flex flex-col justify-between  p-10 rounded-md w-80 h-[520px] shadow ${plan.featured && "border border-primary"}`}
           >
             <div className="flex flex-col gap-6">
               <h2 className="text-xl font-bold">{plan.title}</h2>
