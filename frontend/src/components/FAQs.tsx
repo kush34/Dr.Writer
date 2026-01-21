@@ -27,21 +27,21 @@ const FAQs = ({ faqRef }: Props) => {
     ]
 
     return (
-        <div ref={faqRef} className="flex flex-col justify-center items-center p-10 border ">
+        <div ref={faqRef} className="flex flex-col justify-center items-center p-10">
             <div className="title font-medium text-2xl">
                 FAQs
             </div>
-            <div className="w-full xl:w-1/3 flex flex-col gap-4 mt-8">
+            <div className="w-full xl:w-3/5 flex flex-col gap-4 mt-8">
                 {faqs.map((faq, index) => {
                     return (
-                        <button key={index} className="bg-accent px-5 py-2 flex flex-col items-start border gap-2" onClick={() => setCurrentIdx(prev => (prev == index) ? null : index)}>
+                        <button key={index} className="px-5 py-2 flex flex-col items-start border-b gap-2 py-3" onClick={() => setCurrentIdx(prev => (prev == index) ? null : index)}>
                             <div className="w-full flex justify-between">
-                                <span className="text-bolder text-foreground">
+                                <span className="text-bold text-foreground">
                                     {faq.title}
                                 </span>
                                 <span>{currentIdx != index ? <ChevronDown /> : <X />}</span>
                             </div>
-                            <span className={` ${currentIdx == index ? "inline" : "hidden"} text-start`}>
+                            <span className={` ${currentIdx == index ? "inline" : "hidden"} font-light text-start`}>
                                 {faq.answer}
                             </span>
                         </button>

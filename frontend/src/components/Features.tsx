@@ -29,12 +29,12 @@ const Features = () => {
                 Features
             </div>
             <div className="grid place-items-center m-12">
-                <ul className="grid xl:grid-cols-2 gap-12 max-w-4xl">
+                <ul className="grid xl:grid-cols-2 gap-12 max-w-5xl">
                     {Features.map((feature,index) => {
                         return (
-                            <li key={index} className='flex flex-col flex-wrap gap-2 border shadow p-5 rounded-2xl hover:shadow-none cursor-pointer transition-200ms ease-in'>
-                                <span>{feature.icon}</span>
-                                <h2 className='font-bold'>{feature.title}</h2>
+                            <li key={index} className='flex flex-col flex-wrap gap-3 border shadow p-15 rounded-2xl hover:shadow-none cursor-pointer transition-200ms ease-in'>
+                                <span className='text-primary text-xl'>{feature.icon}</span>
+                                <h2 className='text-xl font-bold'>{feature.title}</h2>
                                 <p className='max-w-sm'>{feature.info}</p>
                             </li>
                         )

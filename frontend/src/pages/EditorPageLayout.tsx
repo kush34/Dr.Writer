@@ -11,7 +11,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
   return (
     <SidebarProvider>
       <GeminiChatBar documentId={id} />
-      <main className="w-full mx-auto">
+      <main>
         <SidebarTrigger />
         {children}
       </main>
