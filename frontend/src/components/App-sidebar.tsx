@@ -28,6 +28,9 @@ import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuPortal, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import { useQuery } from "@tanstack/react-query";
+import { getUserInfo } from "@/service/document";
+import { MAX_TOKENS } from "@/config/llm";
 
 // Menu items.
 const items = [
@@ -37,7 +40,7 @@ const items = [
     icon: Home,
   },
   {
-    title: "Inbox",
+    title: "Plans",
     url: "#",
     icon: Inbox,
   },
@@ -61,6 +64,16 @@ const items = [
 export function AppSidebar() {
   const { theme } = useTheme();
   const { user, loading } = useUser();
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["user"],
+    queryFn: getUserInfo,
+  });
+  const tokenBalance = data?.token_balance ?? 0;
+  const tokenPercent = Math.min(
+    100,
+    Math.round((tokenBalance / MAX_TOKENS) * 100)
+  );
+
   const navigate = useNavigate();
   // console.log(user.photoURL)
   const handleSignOut = async () => {
@@ -95,6 +108,21 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarGroupContent className="p-2 space-y-1">
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>Tokens</span>
+          <span className="font-medium text-foreground">
+            {tokenBalance.toLocaleString()} / {MAX_TOKENS.toLocaleString()}
+          </span>
+        </div>
+
+        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full bg-primary transition-all"
+            style={{ width: `${tokenPercent}%` }}
+          />
+        </div>
+      </SidebarGroupContent>
 
       <SidebarFooter className={`!border-none overflow-visible`}>
         <SidebarContent className="!p-2 !bg-transparent">
@@ -114,7 +142,7 @@ export function AppSidebar() {
                       alt={`Avatar of ${user.displayName ?? "user"}`}
                     />
                   </Avatar>
-                    <span>{user.displayName}</span>
+                  <span>{user.displayName}</span>
                   <ChevronUp className="ml-auto h-4 w-4 opacity-70" />
                 </button>
               </DropdownMenuTrigger>
@@ -165,7 +193,7 @@ export function AppSidebar() {
                 <DropdownMenuItem>Support</DropdownMenuItem>
                 <DropdownMenuItem disabled>API</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
                   Log out
                   <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
                 </DropdownMenuItem>

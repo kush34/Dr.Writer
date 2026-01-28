@@ -14,8 +14,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createDocument, uploadDocument } from "@/service/document";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createDocument, getUserInfo, uploadDocument } from "@/service/document";
 import { toast } from "sonner";
 
 const Home = () => {
@@ -41,6 +41,7 @@ const Home = () => {
       toast.success("Success", { description: "File uploaded successfully" });
     },
   });
+
 
   const handleAdd = () => {
     if (!newTitle.trim()) return;
@@ -94,7 +95,7 @@ const Home = () => {
                 hidden
                 ref={hiddenFileInput}
                 accept=".doc,.docx"
-                onChange={(e)=>handleFileUpload}
+                onChange={(e) => handleFileUpload}
               />
 
               <Button onClick={() => {

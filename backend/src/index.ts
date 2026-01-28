@@ -7,6 +7,7 @@ import http from 'http';
 import userRoutes from './Routes/userRoutes';
 import documentRoutes from './Routes/documentRoutes';
 import rateLimit from 'express-rate-limit'
+import User from "./Models/userModel";
 //Connection to the database
 connectDB();
 const app = express();

@@ -8,6 +8,13 @@ const userSchema = new mongoose.Schema({
     email : {
         type : String,
         require : true
+    },
+    plan_id:{
+        type:mongoose.Types.ObjectId,
+        ref:"Plan"
+    },
+    token_balance:{
+        type:Number,
     }
 })
 

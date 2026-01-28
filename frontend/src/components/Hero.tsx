@@ -8,9 +8,9 @@ const Hero = ({ executeScroll }: { executeScroll: () => void }) => {
 
 
   return (
-    <section className="p-24 xl:p-42 xl:flex gap-15">
+    <section className="p-24 xl:p-42 flex flex-col xl:flex-row justify-center items-center gap-15">
       <div>
-        <div className="xl:mt-24">
+        <div>
           <p className="font-light tracking-tighter">Boost your productivity</p>
           <h1 className="text-2xl xl:text-5xl font-bold leading-tight">
             One stop solution for <br />
@@ -28,7 +28,7 @@ const Hero = ({ executeScroll }: { executeScroll: () => void }) => {
         </div>
       </div>
       <div className="w-full xl:w-3/5">
-        <img src="./Editor.png" className="xl:p-5 rounded shadow-xl border border-gray-200" alt="" />
+        <img src="./Editor.png" className="rounded-xl border shadow-xl border border-gray-200" alt="" />
       </div>
     </section>
   );

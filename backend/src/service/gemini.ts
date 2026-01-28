@@ -69,7 +69,7 @@ export const useGeminiStream = async (userPrompt: string, systemPrompt: string, 
 
   // IMPORTANT: do NOT consume the stream here
   const result = await model.generateContentStream(userPrompt);
-
+  // console.log("TOKEN USAGE",(await result.response).usageMetadata)
   return result; // result.stream is the async iterable
 };
 

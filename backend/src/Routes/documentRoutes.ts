@@ -11,6 +11,8 @@ import rateLimit from 'express-rate-limit';
 import Chat from '../Models/chatModel';
 import { applyEdits } from '../utils/applyEdits';
 import { sanitizeOperations } from '../utils/llmActions';
+import { error } from "console";
+import { MAX_TOKENS_PER_REQUEST } from "../Config/llm";
 
 const geminiLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -228,6 +230,22 @@ router.post(
       return res.status(400).end("Invalid payload");
     }
 
+    // Reserve tokens BEFORE LLM call
+    const reservedUser = await User.findOneAndUpdate(
+      {
+        _id: user_id,
+        token_balance: { $gte: MAX_TOKENS_PER_REQUEST }
+      },
+      {
+        $inc: { token_balance: -MAX_TOKENS_PER_REQUEST }
+      },
+      { new: true }
+    );
+
+    if (!reservedUser) {
+      return res.status(402).json({ error: "Insufficient token balance" });
+    }
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -247,20 +265,50 @@ router.post(
         if (!text) continue;
 
         fullResponse += text;
-
         res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
       }
 
+      const usageToken =
+        (await result.response).usageMetadata?.totalTokenCount;
+
+      if (!usageToken || typeof usageToken !== "number") {
+        throw new Error("Invalid usage metadata");
+      }
+
+      // Refund unused tokens
+      const refund = MAX_TOKENS_PER_REQUEST - usageToken;
+
+      if (refund > 0) {
+        await User.updateOne(
+          { _id: user_id },
+          { $inc: { token_balance: refund } }
+        );
+      }
+
+      // Persist chat only after successful settlement
       await Chat.create({
         documentId,
         prompt: userPrompt,
         response: fullResponse,
+        tokensUsed: usageToken
       });
 
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({
+          type: "done",
+          usageToken,
+        })}\n\n`
+      );
       res.end();
     } catch (err) {
       console.error("Gemini stream error:", err);
+
+      // Full refund on failure
+      await User.updateOne(
+        { _id: user_id },
+        { $inc: { token_balance: MAX_TOKENS_PER_REQUEST } }
+      );
+
       res.write(
         `data: ${JSON.stringify({ error: "LLM stream failed" })}\n\n`
       );
@@ -268,6 +316,7 @@ router.post(
     }
   }
 );
+
 
 
 

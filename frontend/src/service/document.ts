@@ -43,3 +43,8 @@ export const getChatsForDocument = async (documentId: string) => {
   const res = await apiClient.get(`/document/getChats/${documentId}`)
   return res.data
 }
+
+export const getUserInfo = async ()=>{
+  const res = await apiClient.get("/user");
+  return res.data;
+}

@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-
+import { useNavigate } from 'react-router-dom';
 
 type tUser = {
     displayName: string | null
@@ -18,7 +18,7 @@ const UserContext = createContext<tUserContext | null>(null);
 const UserContextProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<tUser | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
-
+    const navigate = useNavigate();
     useEffect(() => {
         const auth = getAuth();
 
@@ -32,14 +32,14 @@ const UserContextProvider = ({ children }: { children: ReactNode }) => {
                     emailVerified: user.emailVerified,
                 });
             } else {
-                setUser(null); // Clear user data on logout
+                setUser(null); 
+                navigate("/")
             }
             setLoading(false); // Stop loading when user data is fetched
         });
 
         return () => unsubscribe(); // Cleanup on unmount
     }, []);
-
     return (
         <UserContext.Provider value={{ user, loading, setLoading }}>
             {children}
