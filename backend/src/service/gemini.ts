@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { error } from "console";
 
 const GEMINI_API_KEY = process.env.Gemini_API;
-if(!GEMINI_API_KEY){
+if (!GEMINI_API_KEY) {
   throw new error("Gemini_API not found in env.")
 }
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -61,12 +61,13 @@ OUTPUT:
   return JSON.parse(text)
 }
 
-export const useGeminiStream = async (userPrompt: string, systemPrompt: string, command: string) => {
+export const useGeminiStream = async (userPrompt: string, systemPrompt: string, command: string, modelName: string) => {
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: modelName,
     systemInstruction: systemPrompt,
   });
 
+  // console.log("USING GEMINI MODEL",modelName)
   // IMPORTANT: do NOT consume the stream here
   const result = await model.generateContentStream(userPrompt);
   // console.log("TOKEN USAGE",(await result.response).usageMetadata)

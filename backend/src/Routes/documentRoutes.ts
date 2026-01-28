@@ -223,10 +223,10 @@ router.post(
   geminiLimiter,
   firebaseTokenVerify,
   async (req: Request, res: Response) => {
-    const { userPrompt, documentId } = req.body;
+    const { userPrompt, documentId, modelName } = req.body;
     const user_id = req.user_id;
 
-    if (!userPrompt || !user_id || !documentId) {
+    if (!userPrompt || !user_id || !documentId || !modelName) {
       return res.status(400).end("Invalid payload");
     }
 
@@ -254,7 +254,7 @@ router.post(
     let fullResponse = "";
 
     try {
-      const result = await useGeminiStream(userPrompt, "", "");
+      const result = await useGeminiStream(userPrompt, "", "", modelName);
 
       for await (const chunk of result.stream) {
         const text =
