@@ -18,3 +18,19 @@ export interface tUser {
     name: string
     email: string
 }
+
+export interface tPlan{
+    id:string,
+    name:string
+    monthly_credits:number
+}
+
+export interface tUsage {
+    id:string
+    user_id:string
+    mode:string,
+    input_tokens:number
+    output_tokens:number
+    cost:number
+    createdAt:string
+}   

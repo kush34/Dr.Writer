@@ -38,8 +38,8 @@ if (root) {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<App />} />
           <Route element={<ThemedRoutes />}>
-            <Route path="/login" element={<App />} />
             <Route path="/home" element={<Home />} />
             <Route path="/home/:id" element={<EditorPage />} />
           </Route>

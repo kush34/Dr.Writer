@@ -9,7 +9,7 @@ import { useSharedEditor } from "@/context/EditorContext";
 import apiClient from "@/service/axiosConfig";
 import { getAuth } from "firebase/auth";
 import { toast } from "sonner";
-
+import type { Editor } from "@tiptap/core";
 export interface tChat {
   prompt: string
   response: string
@@ -80,19 +80,27 @@ export function GeminiChatBar({ documentId }: { documentId: string }) {
 
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done) {
+          break
+        };
         buffer += decoder.decode(value, { stream: true });
         const events = buffer.split("\n\n");
         buffer = events.pop();
         for (const event of events) {
           if (!event.startsWith("data: ")) continue;
           const payload = JSON.parse(event.replace("data: ", ""));
-          if (payload.done) {
+          if (payload.type === "done") {
+            console.log("Gemini usage tokens:", payload.usageToken);
+
             queryClient.setQueryData(["documentChat", documentId], (old) => {
               const chats = [...old.documentChat];
-              chats[chats.length - 1] = { ...chats[chats.length - 1], streaming: false };
+              chats[chats.length - 1] = {
+                ...chats[chats.length - 1],
+                streaming: false,
+              };
               return { ...old, documentChat: chats };
             });
+
             return;
           }
           if (payload.chunk) {
