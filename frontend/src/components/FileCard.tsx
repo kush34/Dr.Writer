@@ -1,7 +1,7 @@
 import { useTheme } from '@/context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 
-type tFile = {
+export type tFile = {
   _id: string
   title: string
 }

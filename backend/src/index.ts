@@ -37,7 +37,7 @@ app.use(express.urlencoded({extended:true}));
 app.use(globalLimiter);
 app.use(express.json());
 app.use('/api',userRoutes);
-app.use('/api/document',documentRoutes);
+app.use('/document',documentRoutes);
 app.use((req, res, next) => {
   res.status(404).json({ message: 'Route not found' });
 });
