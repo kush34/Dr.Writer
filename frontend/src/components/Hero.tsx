@@ -19,7 +19,7 @@ const Hero = ({ executeScroll }: { executeScroll: () => void }) => {
           <p className="mt-2">Edit all your Documents at single point <br /> enhanced with LLM</p>
         </div>
         <div className="flex gap-5 py-5">
-          <Button onClick={() => navigate("/login")}>
+          <Button className='text-white' onClick={() => navigate("/login")}>
             Start Writing
           </Button>
           <Button variant={"secondary"} onClick={executeScroll}>

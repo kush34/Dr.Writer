@@ -40,7 +40,7 @@ const Navbar = ({ faqexecuteScroll, executeScroll }: navbarProps) => {
               </button>
             )
           })}
-          <Button>
+          <Button className='text-white'>
             Get Started
           </Button>
         </div>
