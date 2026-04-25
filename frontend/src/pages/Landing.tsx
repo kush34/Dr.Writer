@@ -291,7 +291,7 @@ const Landing = () => {
 
           <div className="relative">
             <div className="absolute inset-x-10 top-6 h-24 rounded-full bg-[#ffe6c8] blur-3xl" />
-            <div className="relative overflow-hidden rounded-[2rem] border border-black/10 bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
+            <div className="relative  rounded-[2rem] border border-black/10 bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
               <div className="overflow-hidden rounded-[1.5rem] bg-[#f4efe8]">
                 <img
                   src="./Editor.png"
@@ -525,11 +525,6 @@ const Landing = () => {
                   onKeyDown={(e) => e.key === "Enter" && handleCtaSubmit()}
                   className="h-11 rounded-full bg-[#faf7f2]"
                 />
-                <Input
-                  readOnly
-                  value="Built for individual and team writing"
-                  className="h-11 rounded-full bg-[#faf7f2] text-slate-500 cursor-default"
-                />
               </div>
 
               {ctaError && (
@@ -582,7 +577,7 @@ const Landing = () => {
                 onClick={handleHeroSubmit}
                 className="h-12 rounded-full bg-slate-950 px-6 text-white hover:bg-slate-800"
               >
-                Reserve my spot
+                Get Started
               </Button>
             </div>
             {heroError && (
