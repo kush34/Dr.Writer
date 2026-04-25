@@ -1,23 +1,129 @@
-import { ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { GeminiChatBar } from "@/components/GeminiChatBar";
-import './printer.css'
 import { useParams } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
+import "./printer.css";
 
-const Layout = ({ children }: { children: ReactNode }) => {
+const DEFAULT_DESKTOP_SPLIT = 50;
+const MIN_PANEL_WIDTH = 320;
+const SPLIT_STORAGE_KEY = "editor-chat-split";
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const EditorPageLayout = ({ children }: { children: ReactNode }) => {
   const { id } = useParams();
+  const isMobile = useIsMobile();
+  const layoutRef = useRef<HTMLDivElement | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_DESKTOP_SPLIT);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const savedWidth = window.localStorage.getItem(SPLIT_STORAGE_KEY);
+    if (!savedWidth) return;
+
+    const parsedWidth = Number(savedWidth);
+    if (Number.isFinite(parsedWidth)) {
+      setSidebarWidth(parsedWidth);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) return;
+    window.localStorage.setItem(SPLIT_STORAGE_KEY, String(sidebarWidth));
+  }, [isMobile, sidebarWidth]);
+
+  useEffect(() => {
+    if (!isDragging || isMobile) return;
+
+    const updateSidebarWidth = (clientX: number) => {
+      const layout = layoutRef.current;
+      if (!layout) return;
+
+      const bounds = layout.getBoundingClientRect();
+      const minPercent = (MIN_PANEL_WIDTH / bounds.width) * 100;
+      const maxPercent = 100 - minPercent;
+      const nextWidth = ((clientX - bounds.left) / bounds.width) * 100;
+
+      setSidebarWidth(clamp(nextWidth, minPercent, maxPercent));
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      updateSidebarWidth(event.clientX);
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [isDragging, isMobile]);
+
   if (!id) return null;
+
+  if (isMobile) {
+    return (
+      <SidebarProvider defaultOpen className="relative min-h-screen">
+        <div className="relative flex min-h-screen w-full overflow-hidden">
+          <GeminiChatBar documentId={id} mode="mobile" />
+          <main className="relative min-w-0 flex-1">
+            <SidebarTrigger className="absolute left-4 top-4 z-20 md:hidden" />
+            {children}
+          </main>
+        </div>
+        <Toaster />
+      </SidebarProvider>
+    );
+  }
+
   return (
-    <SidebarProvider>
-      <GeminiChatBar documentId={id} />
-      <main>
-        <SidebarTrigger />
+    <div
+      ref={layoutRef}
+      className="relative flex min-h-screen w-full overflow-hidden"
+      style={{ "--sidebar-width": `${sidebarWidth}%` } as CSSProperties}
+    >
+      <div
+        className="relative flex shrink-0"
+        style={{ width: `${sidebarWidth}%`, minWidth: `${MIN_PANEL_WIDTH}px` }}
+      >
+        <GeminiChatBar documentId={id} mode="desktop" />
+      </div>
+
+      <button
+        type="button"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize chat and editor panels"
+        aria-valuenow={Math.round(sidebarWidth)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        className="relative z-30 w-3 shrink-0 cursor-col-resize border-x border-border/60 bg-background/70 transition-colors hover:bg-accent/50"
+      >
+        <span className="m-auto block h-14 w-1 rounded-full bg-border" />
+      </button>
+
+      <main className="relative min-w-0 flex-1 overflow-hidden">
         {children}
       </main>
-      <Toaster/>
-    </SidebarProvider>
+      <Toaster />
+    </div>
   );
 };
 
-export default Layout;
+export default EditorPageLayout;
