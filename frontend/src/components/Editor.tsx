@@ -65,7 +65,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
   if (error) return <p>Failed to load document</p>;
   if (!data) return <p>No document data</p>;
   return (
-    <div className="Editor flex h-full min-h-0 w-full min-w-0">
+    <div className="Editor flex h-full min-h-0 w-full min-w-0 overflow-hidden">
       <SimpleEditor content={data.content} onEditorReady={onEditorReady} updateDocument={updateDocument} />
     </div>
   );

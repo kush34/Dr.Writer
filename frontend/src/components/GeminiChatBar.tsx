@@ -243,7 +243,7 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
 
   if (mode === "desktop") {
     return (
-      <aside className="flex h-screen min-h-screen shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar text-sidebar-foreground"
+      <aside className="flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar text-sidebar-foreground"
         style={{ width: "100%" }}
       >
         {panel}
