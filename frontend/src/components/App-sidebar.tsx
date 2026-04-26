@@ -67,6 +67,7 @@ export function AppSidebar() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["user"],
     queryFn: getUserInfo,
+    enabled: !loading && !!user,
   });
   const tokenBalance = data?.token_balance ?? 0;
   const tokenPercent = Math.min(

@@ -17,7 +17,7 @@ const provider = new GoogleAuthProvider();
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+export const auth = getAuth(app);
 
 const normalizeError = (error: unknown) => {
   if (error instanceof FirebaseError) {

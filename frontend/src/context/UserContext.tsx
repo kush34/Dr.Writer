@@ -1,6 +1,9 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/firebaseAuth/firebaseConfig";
 import { useNavigate } from 'react-router-dom';
+import Loader from '@/components/loaders/Loader';
+import * as firebaseAuth from "@/firebaseAuth/firebaseConfig"
+import { onAuthStateChanged } from 'firebase/auth';
 
 type tUser = {
     displayName: string | null
@@ -20,7 +23,7 @@ const UserContextProvider = ({ children }: { children: ReactNode }) => {
     const [loading, setLoading] = useState<boolean>(true);
     const navigate = useNavigate();
     useEffect(() => {
-        const auth = getAuth();
+        // const auth = getAuth();
 
         // Listener for authentication state changes
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -32,7 +35,7 @@ const UserContextProvider = ({ children }: { children: ReactNode }) => {
                     emailVerified: user.emailVerified,
                 });
             } else {
-                setUser(null); 
+                setUser(null);
                 navigate("/")
             }
             setLoading(false); // Stop loading when user data is fetched
@@ -40,6 +43,11 @@ const UserContextProvider = ({ children }: { children: ReactNode }) => {
 
         return () => unsubscribe(); // Cleanup on unmount
     }, []);
+    if (loading) return (
+        <div>
+            <Loader />
+        </div>
+    )
     return (
         <UserContext.Provider value={{ user, loading, setLoading }}>
             {children}

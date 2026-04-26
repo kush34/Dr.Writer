@@ -206,7 +206,6 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
-  const [shareDialogOpen, setShareDialogOpen] = useState<boolean>(false);
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({

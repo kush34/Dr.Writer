@@ -25,11 +25,7 @@ const queryClient = new QueryClient({
 
 function ThemedRoutes() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <UserContextProvider>
-        <Outlet />
-      </UserContextProvider>
-    </ThemeProvider>
+    <Outlet />
   );
 }
 
@@ -37,19 +33,23 @@ const root = document.getElementById("root");
 
 if (root) {
   ReactDOM.createRoot(root).render(
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Suspense fallback={<div>Loading...</div>}>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<App />} />
-            <Route element={<ThemedRoutes />}>
-              <Route path="/home" element={<Home />} />
-              <Route path="/home/:id" element={<EditorPage />} />
-            </Route>
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <UserContextProvider>
+            <Suspense fallback={<div>Loading...</div>}>
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/login" element={<App />} />
+                <Route element={<ThemedRoutes />}>
+                  <Route path="/home" element={<Home />} />
+                  <Route path="/home/:id" element={<EditorPage />} />
+                </Route>
+              </Routes>
+            </Suspense>
+          </UserContextProvider>
+        </BrowserRouter>
+      </QueryClientProvider >
+    </ThemeProvider>
   );
 }
