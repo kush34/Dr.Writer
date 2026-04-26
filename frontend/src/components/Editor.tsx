@@ -10,6 +10,7 @@ import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { DocumentDTO } from "@/types";
+import { useState } from "react";
 
 const normalizeContent = (content: any): JSONContent => {
   if (typeof content === "object" && content?.type === "doc") return content;
@@ -43,6 +44,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
   });
 
 
+
   const updateMutation = useMutation({
     mutationFn: updateDocumentApi,
     onSuccess: () => {
@@ -55,9 +57,9 @@ const Editor = ({ onEditorReady }: EditorProps) => {
     },
   });
 
-  const updateDocument = (editor: tEditor) => {
+  const updateDocument = (editor: tEditor, title: string) => {
     if (!editor || !data) return;
-    updateMutation.mutate({ id, title: data.title, content: editor.getJSON() });
+    updateMutation.mutate({ id, title: title, content: editor.getJSON() });
   };
 
   if (userLoading || isLoading) return <div className="h-screen flex items-center justify-center text-lg">Syncing document…</div>;

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { SetStateAction, useEffect, useRef, useState } from "react"
 import { Editor, EditorContent, EditorContext, JSONContent, useEditor } from "@tiptap/react"
 
 // --- Tiptap Core Extensions ---
@@ -78,7 +78,7 @@ import content from "@/components/tiptap-templates/simple/data/content.json"
 import { useNavigate, useParams } from "react-router-dom"
 import { useUser } from "@/context/UserContext"
 import socket from "@/service/socket"
-import { Plus, Save, SaveIcon, Share, Share2, Share2Icon, Undo2 } from "lucide-react"
+import { Plus, Save, SaveAll, SaveIcon, Share, Share2, Share2Icon, Undo2 } from "lucide-react"
 import ShareFileDialog from "@/components/ShareFileDialoag"
 
 const MainToolbarContent = ({
@@ -193,7 +193,7 @@ type SimpleEditorProps = {
   content: JSONContent;
   title: string;
   onEditorReady?: (editor: Editor) => void;
-  updateDocument: (editor: Editor) => void;
+  updateDocument: (editor: Editor, title: string) => void;
 };
 
 
@@ -206,6 +206,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
+  const [localTitle, setLocalTitle] = useState(title);
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
@@ -292,16 +293,20 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   return (
     <div className="simple-editor-wrapper flex flex-col justify-center">
       <div className="m-2 flex gap-3">
-        <span className="font-bold text-xl mr-5">{title}</span>
+        <input
+          className="px-2 rounded font-bold text-white text-xl mr-5"
+          value={localTitle}
+          onChange={(e) => setLocalTitle(e.target.value)}
+        />
         <ShareFileDialog />
         <Button
           onClick={() => {
             if (!editor) return;
             console.log('Saved fired')
-            updateDocument(editor)
+            updateDocument(editor,localTitle)
           }
           }>
-          <Share2Icon />
+          <SaveAll />
         </Button>
         <Button onClick={() => navigate("/home")}>
           <Undo2 />
