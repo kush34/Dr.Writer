@@ -8,51 +8,49 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { UserPlus } from 'lucide-react';
+import { Plus, UserPlus } from 'lucide-react';
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useContext, useState } from "react";
-import { useToast } from "@/hooks/use-toast";
 import apiClient from "@/service/axiosConfig";
 import { useParams } from "react-router-dom";
-import { ThemeContext } from "@/context/ThemeContext";
+import { toast } from "sonner";
 
 function ShareFileDialog() {
-  const {theme} = useContext(ThemeContext)
-    const [userToAddMail,setUserToAddMail] = useState('');
-    const id = useParams();
-    const [dialogFlag,setDialogFlag]=useState(false);
-    const { toast } = useToast();
-    
-    const handleOkay = async ()=>{
-        if(userToAddMail == ''){ 
-            toast({
-                description: "Please Enter Mail Address ",
-            });
-            return;
-          }
-          const response = await apiClient.post('/document/adduser',{
-            file_id:id.id,
-            userToAddMail,
-          })
-          console.log(response);
-          if(response.status == 200){
-            toast({
-                description: `User Added : ${userToAddMail}`,
-            });
-        }
-        setDialogFlag(false)
+  const [userToAddMail, setUserToAddMail] = useState('');
+  const id = useParams();
+  const [dialogFlag, setDialogFlag] = useState(false);
+  // const { toast } = useToast();
+
+  const handleOkay = async () => {
+    if (userToAddMail == '') {
+      toast.error("Failed", {
+        description: "Please Enter Mail Address ",
+      });
+      return;
     }
+    const response = await apiClient.post('/document/adduser', {
+      file_id: id.id,
+      userToAddMail,
+    })
+    console.log(response);
+    if (response.status == 200) {
+      toast.success("Added Email", {
+        description: `User Added : ${userToAddMail}`,
+      });
+    }
+    setDialogFlag(false)
+  }
   return (
     <Dialog open={dialogFlag} onOpenChange={setDialogFlag}>
       <DialogTrigger asChild>
-        <Button className='border-2 text-black hover:bg-black hover:text-white ' variant="outline"> <UserPlus /></Button>
+        <Button className='border' variant="outline"> <Plus /></Button>
       </DialogTrigger>
-      <DialogContent className={`${theme=='dark' ? "bg-zinc-900":""} sm:max-w-[425px]`}>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New User</DialogTitle>
+          Make changes to your document here. Click Add User when you're done.
           <DialogDescription>
-            Make changes to your document here. Click Add User when you're done.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -62,7 +60,7 @@ function ShareFileDialog() {
             </Label>
             <Input
               id="name"
-              onChange = {(e)=>setUserToAddMail(e.target.value)}
+              onChange={(e) => setUserToAddMail(e.target.value)}
               className="col-span-3 text-black"
               placeholder='enter mail of user to add'
             />

@@ -78,7 +78,8 @@ import content from "@/components/tiptap-templates/simple/data/content.json"
 import { useNavigate, useParams } from "react-router-dom"
 import { useUser } from "@/context/UserContext"
 import socket from "@/service/socket"
-import { Save, SaveIcon, Share, Share2, Share2Icon, Undo2 } from "lucide-react"
+import { Plus, Save, SaveIcon, Share, Share2, Share2Icon, Undo2 } from "lucide-react"
+import ShareFileDialog from "@/components/ShareFileDialoag"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -190,12 +191,13 @@ const MobileToolbarContent = ({
 
 type SimpleEditorProps = {
   content: JSONContent;
+  title: string;
   onEditorReady?: (editor: Editor) => void;
   updateDocument: (editor: Editor) => void;
 };
 
 
-export function SimpleEditor({ content, onEditorReady, updateDocument }: SimpleEditorProps) {
+export function SimpleEditor({ title, content, onEditorReady, updateDocument }: SimpleEditorProps) {
   const isMobile = useIsBreakpoint()
   const navigate = useNavigate();
   const { id } = useParams();
@@ -204,6 +206,7 @@ export function SimpleEditor({ content, onEditorReady, updateDocument }: SimpleE
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
+  const [shareDialogOpen, setShareDialogOpen] = useState<boolean>(false);
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
@@ -290,15 +293,8 @@ export function SimpleEditor({ content, onEditorReady, updateDocument }: SimpleE
   return (
     <div className="simple-editor-wrapper flex flex-col justify-center">
       <div className="m-2 flex gap-3">
-        <Button
-          onClick={() => {
-            if (!editor) return;
-            console.log('Saved fired')
-            updateDocument(editor)
-          }
-          }>
-          <SaveIcon />
-        </Button>
+        <span className="font-bold text-xl mr-5">{title}</span>
+        <ShareFileDialog />
         <Button
           onClick={() => {
             if (!editor) return;
@@ -336,7 +332,6 @@ export function SimpleEditor({ content, onEditorReady, updateDocument }: SimpleE
             />
           )}
         </Toolbar>
-
         <EditorContent
           editor={editor}
           role="presentation"

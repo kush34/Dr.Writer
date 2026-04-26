@@ -66,7 +66,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
   if (!data) return <p>No document data</p>;
   return (
     <div className="Editor flex h-full min-h-0 w-full min-w-0 overflow-hidden">
-      <SimpleEditor content={data.content} onEditorReady={onEditorReady} updateDocument={updateDocument} />
+      <SimpleEditor title={data.title} content={data.content} onEditorReady={onEditorReady} updateDocument={updateDocument} />
     </div>
   );
 };
