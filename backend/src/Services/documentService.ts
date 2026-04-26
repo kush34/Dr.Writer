@@ -6,10 +6,38 @@ import User from "../Models/userModel";
 import Document from "../Models/documentModel";
 import Chat from "../Models/chatModel";
 import { MAX_TOKENS_PER_REQUEST } from "../Config/llm";
-import { getEditOperations, useGeminiStream } from "../service/gemini";
+// import { getEditOperations, useGeminiStream } from "../service/gemini";
 import { applyEdits } from "../utils/applyEdits";
 import { sanitizeOperations } from "../utils/llmActions";
-import { AppError } from "../utils/appError";
+import { AppError, isAppError } from "../utils/appError";
+// Add:
+import { openRouterStream, openRouterComplete } from "../service/openrouter";
+import { getEditOperations } from "../service/gemini";
+
+const extractJsonPayload = (rawResponse: string) => {
+  const trimmed = rawResponse.trim();
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fencedMatch?.[1]) {
+      return JSON.parse(fencedMatch[1].trim());
+    }
+
+    const firstBrace = trimmed.indexOf("{");
+    const lastBrace = trimmed.lastIndexOf("}");
+
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
+    }
+
+    throw new AppError(
+      502,
+      "The model returned an invalid edit format. Please try again."
+    );
+  }
+};
 
 const findDocumentOrThrow = async (documentId: string) => {
   const document = await Document.findById(documentId);
@@ -119,8 +147,52 @@ export const performDocumentAction = async (
     throw new AppError(403, "Document not found");
   }
 
-  const llmResponse = await getEditOperations(document.content, command);
-  const safeOperations = sanitizeOperations(llmResponse.operations);
+  const blockCount = Array.isArray(document.content?.content)
+    ? document.content.content.length
+    : 0;
+
+  const rawResponse = await openRouterComplete(
+    `You are a TipTap document editor.
+
+Return ONLY valid JSON. No markdown. No prose. No explanation.
+
+The document is TipTap JSON. Edit operations use top-level block indexes, not character offsets.
+
+Allowed response shape:
+{
+  "operations": [
+    { "type": "insert", "at": number, "text": string },
+    { "type": "replace", "from": number, "to": number, "text": string },
+    { "type": "delete", "from": number, "to": number }
+  ]
+}
+
+Rules:
+- "at", "from", and "to" refer to indexes in the top-level "content" array.
+- Current top-level block count is ${blockCount}.
+- Keep indexes within the existing block range.
+- Use "insert" to add new paragraph text.
+- Use "replace" or "delete" only for whole top-level blocks.
+
+Document:
+${JSON.stringify(document.content)}
+
+Command:
+${command}`,
+    "openai/gpt-4o-mini" // or pass model as param
+  );
+
+  let llmResponse: { operations?: unknown[] };
+  try {
+    llmResponse = extractJsonPayload(rawResponse);
+  } catch (error) {
+    console.error("Invalid OpenRouter edit response:", rawResponse);
+    throw error;
+  }
+
+  const safeOperations = sanitizeOperations(
+    Array.isArray(llmResponse.operations) ? llmResponse.operations as never[] : []
+  );
 
   if (safeOperations.length === 0) {
     throw new AppError(400, "LLM returned no valid operations");
@@ -141,79 +213,57 @@ export const streamUserPrompt = async (
   modelName: string,
   res: Response
 ) => {
-  const reservedUser = await User.findOneAndUpdate(
-    {
-      _id: userId,
-      token_balance: { $gte: MAX_TOKENS_PER_REQUEST },
-    },
-    {
-      $inc: { token_balance: -MAX_TOKENS_PER_REQUEST },
-    },
-    { new: true }
-  );
-
-  if (!reservedUser) {
-    throw new AppError(402, "Insufficient token balance");
-  }
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders?.();
-
-  let fullResponse = "";
-
   try {
-    const result = await useGeminiStream(userPrompt, "", "", modelName);
+    let tokenCount = 0;
+    const reservedUser = await User.findOneAndUpdate(
+      { _id: userId, token_balance: { $gte: MAX_TOKENS_PER_REQUEST } },
+      { $inc: { token_balance: -MAX_TOKENS_PER_REQUEST } },
+      { new: true }
+    );
 
-    for await (const chunk of result.stream) {
-      const text =
-        chunk.candidates?.[0]?.content?.parts
-          ?.map((part) => part.text)
-          .join("") || "";
+    if (!reservedUser) {
+      throw new AppError(402, "Insufficient token balance");
+    }
+    await openRouterStream(
+      userPrompt,
+      modelName,
+      res,
+      (text) => {
+        res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
+      },
+      async (fullResponse) => {
+        // Rough token estimate — OpenRouter doesn't always return usage in stream
+        tokenCount = Math.ceil(fullResponse.length / 4);
+        const refund = MAX_TOKENS_PER_REQUEST - tokenCount;
 
-      if (!text) {
-        continue;
+        if (refund > 0) {
+          await User.updateOne({ _id: userId }, { $inc: { token_balance: refund } });
+        }
+
+        await Chat.create({
+          documentId,
+          prompt: userPrompt,
+          response: fullResponse,
+          tokensUsed: tokenCount,
+        });
+
+        res.write(`data: ${JSON.stringify({ type: "done", usageToken: tokenCount })}\n\n`);
+        res.end();
       }
-
-      fullResponse += text;
-      res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
-    }
-
-    const usageToken = (await result.response).usageMetadata?.totalTokenCount;
-
-    if (!usageToken || typeof usageToken !== "number") {
-      throw new Error("Invalid usage metadata");
-    }
-
-    const refund = MAX_TOKENS_PER_REQUEST - usageToken;
-    if (refund > 0) {
-      await User.updateOne({ _id: userId }, { $inc: { token_balance: refund } });
-    }
-
-    await Chat.create({
-      documentId,
-      prompt: userPrompt,
-      response: fullResponse,
-      tokensUsed: usageToken,
-    });
-
-    res.write(
-      `data: ${JSON.stringify({
-        type: "done",
-        usageToken,
-      })}\n\n`
     );
-    res.end();
   } catch (error) {
-    console.error("Gemini stream error:", error);
+    console.error("OpenRouter stream error:", error);
+    await User.updateOne({ _id: userId }, { $inc: { token_balance: MAX_TOKENS_PER_REQUEST } });
 
-    await User.updateOne(
-      { _id: userId },
-      { $inc: { token_balance: MAX_TOKENS_PER_REQUEST } }
-    );
+    const statusCode = isAppError(error) ? error.statusCode : 500;
+    const message = isAppError(error) ? error.message : "LLM stream failed";
+    const payload = { error: message, statusCode };
 
-    res.write(`data: ${JSON.stringify({ error: "LLM stream failed" })}\n\n`);
+    if (!res.headersSent) {
+      return res.status(statusCode).json(payload);
+    }
+
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
     res.end();
   }
 };

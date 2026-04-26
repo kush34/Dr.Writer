@@ -27,9 +27,24 @@ type DocumentChatResponse = {
 };
 
 const availableModels = [
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-  "gemini-2.0-flash",
+  // General Purpose
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "google/gemma-3-27b-it:free",
+  "openai/gpt-oss-120b:free",
+  "openai/gpt-oss-20b:free",
+
+  // Coding
+  "qwen/qwen3-coder:free",
+
+  // Reasoning
+  "nvidia/nemotron-3-super-120b-a12b:free",
+
+  // Vision + Tools
+  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-nano-12b-v2-vl:free",
+
+  // Auto-select (OpenRouter picks best available free model)
+  "openrouter/free",
 ];
 
 type GeminiChatBarProps = {
@@ -150,13 +165,36 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
   });
 
   const handleActions = async () => {
-    if (!editor?.commands) return;
+    if (!editor?.commands || !prompt.trim()) return;
+
+    const currentPrompt = prompt;
+    setPrompt("");
+
+    queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => ({
+      ...(old ?? { documentChat: [] }),
+      documentChat: [
+        ...(old?.documentChat ?? []),
+        {
+          prompt: currentPrompt,
+          response: "Applied changes to the document.",
+          documentId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+      ]
+    }));
+
     try {
-      const res = await apiClient.post(`/document/actions/${documentId}`, { command: prompt, modelName: currentModel });
+      const res = await apiClient.post(`/document/actions/${documentId}`, { command: currentPrompt, modelName: currentModel });
       const { updatedContent } = res.data;
       editor.commands.setContent(updatedContent, false);
       editor.commands.focus();
     } catch (err) {
+      setPrompt(currentPrompt);
+      queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => ({
+        ...(old ?? { documentChat: [] }),
+        documentChat: (old?.documentChat ?? []).slice(0, -1)
+      }));
       console.log(err);
       toast({ title: "Error", description: "LLM operation failed" });
     }
