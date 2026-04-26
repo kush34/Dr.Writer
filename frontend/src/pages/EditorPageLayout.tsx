@@ -78,9 +78,11 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
       <SidebarProvider defaultOpen className="relative min-h-screen">
         <div className="relative flex min-h-screen w-full overflow-hidden">
           <GeminiChatBar documentId={id} mode="mobile" />
-          <main className="relative min-w-0 flex-1">
+          <main className="relative flex min-w-0 flex-1 overflow-hidden bg-background">
             <SidebarTrigger className="absolute left-4 top-4 z-20 md:hidden" />
-            {children}
+            <div className="flex h-full min-h-screen w-full min-w-0 justify-center px-3 pb-3 pt-16">
+              {children}
+            </div>
           </main>
         </div>
         <Toaster />
@@ -118,8 +120,10 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
         <span className="m-auto block h-14 w-1 rounded-full bg-border" />
       </button>
 
-      <main className="relative min-w-0 flex-1 overflow-hidden">
-        {children}
+      <main className="relative flex min-w-0 flex-1 overflow-hidden bg-background">
+        <div className="flex h-full min-h-screen w-full min-w-0 justify-center px-4 py-4 md:px-6">
+          {children}
+        </div>
       </main>
       <Toaster />
     </div>

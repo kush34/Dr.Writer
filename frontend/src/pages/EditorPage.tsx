@@ -12,7 +12,7 @@ const EditorPage = () => {
     <SharedEditorContext.Provider value={{ editor: editorInstance, setEditor: setEditorInstance }}>
       <UserContextProvider>
         <EditorPageLayout>
-          <div id="editor" className="m-8">
+          <div id="editor" className="flex h-full min-h-0 w-full min-w-0">
             <Editor onEditorReady={setEditorInstance} />
           </div>
         </EditorPageLayout>

@@ -77,7 +77,7 @@ import content from "@/components/tiptap-templates/simple/data/content.json"
 import { useNavigate, useParams } from "react-router-dom"
 import { useUser } from "@/context/UserContext"
 import socket from "@/service/socket"
-import { Save, SaveIcon, Undo2 } from "lucide-react"
+import { Save, SaveIcon, Share, Share2, Share2Icon, Undo2 } from "lucide-react"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -281,7 +281,7 @@ export function SimpleEditor({ content, onEditorReady, updateDocument }: SimpleE
     }
   }, [editor, user, id]);
   return (
-    <div className="simple-editor-wrapper">
+    <div className="simple-editor-wrapper flex flex-col justify-center">
       <div className="m-2 flex gap-3">
         <Button
           onClick={() => {
@@ -291,6 +291,15 @@ export function SimpleEditor({ content, onEditorReady, updateDocument }: SimpleE
           }
           }>
           <SaveIcon />
+        </Button>
+        <Button
+          onClick={() => {
+            if (!editor) return;
+            console.log('Saved fired')
+            updateDocument(editor)
+          }
+          }>
+          <Share2Icon />
         </Button>
         <Button onClick={() => navigate("/home")}>
           <Undo2 />
