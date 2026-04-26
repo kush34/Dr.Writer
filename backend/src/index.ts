@@ -4,8 +4,8 @@ import connectDB from './Config/database'
 import cors from "cors";
 import { Server } from "socket.io";
 import http from 'http';
-import userRoutes from './Routes/userRoutes';
-import documentRoutes from './Routes/documentRoutes';
+import userRouter from './Routes/userRouter';
+import documentRouter from './Routes/documentRouter';
 import rateLimit from 'express-rate-limit'
 import User from "./Models/userModel";
 //Connection to the database
@@ -36,8 +36,8 @@ app.use(cors(corsOptions));
 app.use(express.urlencoded({extended:true}));
 app.use(globalLimiter);
 app.use(express.json());
-app.use('/api',userRoutes);
-app.use('/api/document',documentRoutes);
+app.use('/api',userRouter);
+app.use('/api/document',documentRouter);
 app.use((req, res, next) => {
   res.status(404).json({ message: 'Route not found' });
 });
