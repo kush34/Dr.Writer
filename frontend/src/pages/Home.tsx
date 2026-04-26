@@ -61,7 +61,6 @@ const Home = () => {
   return (
     <Layout>
       <Files />
-
       <div className="flex justify-end mr-12">
         <Dialog>
           <DialogTrigger asChild>
