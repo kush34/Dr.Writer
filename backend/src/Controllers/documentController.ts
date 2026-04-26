@@ -5,12 +5,14 @@ import upload from "../service/multer";
 import { MAX_TOKENS_PER_REQUEST } from "../Config/llm";
 import {
   addUserToDocument,
+  createDocumentImageSignature,
   createDocument,
   getDocumentChats,
   getDocumentData,
   getDocumentList,
   getTestDocument,
   performDocumentAction,
+  registerDocumentImage,
   streamUserPrompt,
   syncDocument,
   updateDocument,
@@ -20,13 +22,16 @@ import { AppError } from "../utils/appError";
 import { handleControllerError } from "../utils/controllerErrorHandler";
 import {
   addUserSchema,
+  createDocumentImageSignatureSchema,
   createDocumentSchema,
   documentActionBodySchema,
   documentActionParamsSchema,
   documentIdBodySchema,
   getChatsParamsSchema,
+  registerDocumentImageSchema,
   syncDocumentSchema,
   updateDocumentSchema,
+  uploadDocumentImageParamsSchema,
   userPromptSchema,
 } from "../validation/documentSchemas";
 
@@ -166,6 +171,30 @@ const getChatsHandler = async (req: Request, res: Response) => {
   }
 };
 
+const createDocumentImageSignatureHandler = async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuthenticatedUser(req);
+    const { documentId } = uploadDocumentImageParamsSchema.parse(req.params);
+    const { originalName } = createDocumentImageSignatureSchema.parse(req.body);
+    const result = await createDocumentImageSignature(userId, documentId, originalName);
+    res.status(200).json(result);
+  } catch (error) {
+    handleControllerError(res, error);
+  }
+};
+
+const registerDocumentImageHandler = async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuthenticatedUser(req);
+    const { documentId } = uploadDocumentImageParamsSchema.parse(req.params);
+    const image = registerDocumentImageSchema.parse(req.body);
+    const result = await registerDocumentImage(userId, documentId, image);
+    res.status(200).json(result);
+  } catch (error) {
+    handleControllerError(res, error);
+  }
+};
+
 export const registerDocumentRoutes = (router: Router) => {
   router.get("/getDoc", getDocHandler);
   router.post("/createDocument", firebaseTokenVerify, createDocumentHandler);
@@ -190,6 +219,16 @@ export const registerDocumentRoutes = (router: Router) => {
     firebaseTokenVerify,
     upload.single("file"),
     fileUploadHandler
+  );
+  router.post(
+    "/:documentId/images/sign",
+    firebaseTokenVerify,
+    createDocumentImageSignatureHandler
+  );
+  router.post(
+    "/:documentId/images/register",
+    firebaseTokenVerify,
+    registerDocumentImageHandler
   );
   router.get("/getChats/:documentId", firebaseTokenVerify, getChatsHandler);
 };

@@ -68,7 +68,8 @@ import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
 import { ThemeToggle } from "@/components/tiptap-templates/simple/theme-toggle"
 
 // --- Lib ---
-import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
+import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
+import { uploadDocumentImage } from "@/service/document"
 
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
@@ -238,7 +239,13 @@ export function SimpleEditor({ content, onEditorReady, updateDocument }: SimpleE
         accept: "image/*",
         maxSize: MAX_FILE_SIZE,
         limit: 3,
-        upload: handleImageUpload,
+        upload: (file, onProgress, abortSignal) => {
+          if (!id) {
+            throw new Error("Document id is required for image uploads");
+          }
+
+          return uploadDocumentImage(id, file, onProgress, abortSignal);
+        },
         onError: (error) => console.error("Upload failed:", error),
       }),
     ],

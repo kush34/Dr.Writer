@@ -1,6 +1,7 @@
 import fs from "fs";
 import mammoth from "mammoth";
 import { Response } from "express";
+import cloudinary from "../Config/cloudinary";
 import User from "../Models/userModel";
 import Document from "../Models/documentModel";
 import Chat from "../Models/chatModel";
@@ -269,4 +270,88 @@ export const uploadDocumentFile = async (
 
 export const getDocumentChats = async (documentId: string) => {
   return Chat.find({ documentId });
+};
+
+const assertCloudinaryConfigured = () => {
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    throw new AppError(500, "Cloudinary is not configured");
+  }
+};
+
+const sanitizeBaseName = (originalName: string) =>
+  originalName
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[^a-zA-Z0-9-_]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60) || "image";
+
+export const createDocumentImageSignature = async (
+  userId: string,
+  documentId: string,
+  originalName: string
+) => {
+  await getDocumentData(userId, documentId);
+  assertCloudinaryConfigured();
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = `documents/${documentId}`;
+  const publicId = `${folder}/${Date.now()}-${sanitizeBaseName(originalName)}`;
+
+  const signature = cloudinary.utils.api_sign_request(
+    {
+      folder,
+      public_id: publicId,
+      timestamp,
+    },
+    process.env.CLOUDINARY_API_SECRET as string
+  );
+
+  return {
+    timestamp,
+    folder,
+    publicId,
+    signature,
+    apiKey: process.env.CLOUDINARY_API_KEY as string,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME as string,
+  };
+};
+
+export const registerDocumentImage = async (
+  userId: string,
+  documentId: string,
+  image: {
+    publicId: string;
+    url: string;
+    originalName: string;
+    bytes: number;
+    format?: string;
+    width?: number;
+    height?: number;
+  }
+) => {
+  const document = await getDocumentData(userId, documentId);
+  const expectedPrefix = `documents/${documentId}/`;
+
+  if (!image.publicId.startsWith(expectedPrefix)) {
+    throw new AppError(400, "Invalid Cloudinary public id for this document");
+  }
+
+  const relatedImage = {
+    publicId: image.publicId,
+    url: image.url,
+    originalName: image.originalName,
+    bytes: image.bytes,
+    format: image.format,
+    width: image.width,
+    height: image.height,
+    uploadedAt: new Date(),
+  };
+
+  document.relatedImages.push(relatedImage);
+  await document.save();
+
+  return {
+    image: relatedImage,
+  };
 };

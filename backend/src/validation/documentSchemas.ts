@@ -23,6 +23,24 @@ export const documentActionParamsSchema = z.object({
   documentId: z.string().trim().min(1),
 });
 
+export const uploadDocumentImageParamsSchema = z.object({
+  documentId: z.string().trim().min(1),
+});
+
+export const createDocumentImageSignatureSchema = z.object({
+  originalName: z.string().trim().min(1),
+});
+
+export const registerDocumentImageSchema = z.object({
+  publicId: z.string().trim().min(1),
+  url: z.string().trim().url(),
+  originalName: z.string().trim().min(1),
+  bytes: z.number().int().nonnegative(),
+  format: z.string().trim().optional(),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+});
+
 export const documentActionBodySchema = z.object({
   command: z.string().trim().min(1),
 });

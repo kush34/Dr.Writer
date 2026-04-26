@@ -1,5 +1,40 @@
 import mongoose from "mongoose";
 
+const relatedImageSchema = new mongoose.Schema(
+    {
+        publicId: {
+            type: String,
+            required: true,
+        },
+        url: {
+            type: String,
+            required: true,
+        },
+        originalName: {
+            type: String,
+            required: true,
+        },
+        bytes: {
+            type: Number,
+            required: true,
+        },
+        format: {
+            type: String,
+        },
+        width: {
+            type: Number,
+        },
+        height: {
+            type: Number,
+        },
+        uploadedAt: {
+            type: Date,
+            default: Date.now,
+        },
+    },
+    { _id: false }
+);
+
 const documentSchema = new mongoose.Schema({
     title: {
         type: String,
@@ -16,6 +51,10 @@ const documentSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId, ref: 'User'
     },
     users: [String],
+    relatedImages: {
+        type: [relatedImageSchema],
+        default: [],
+    },
     createdAt: {
         type: Date,
         default: Date.now // Automatically set the current date/time
