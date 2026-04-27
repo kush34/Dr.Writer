@@ -2,7 +2,7 @@ import { Request, Response, Router } from "express";
 import rateLimit from "express-rate-limit";
 import firebaseTokenVerify from "../Middlewares/firebaseTokenVerify";
 import upload from "../service/multer";
-import { MAX_TOKENS_PER_REQUEST } from "../Config/llm";
+import { enqueueDocumentUpload } from "../service/documentUploadQueue";
 import {
   addUserToDocument,
   createDocumentImageSignature,
@@ -16,7 +16,6 @@ import {
   streamUserPrompt,
   syncDocument,
   updateDocument,
-  uploadDocumentFile,
 } from "../Services/documentService";
 import { AppError } from "../utils/appError";
 import { handleControllerError } from "../utils/controllerErrorHandler";
@@ -154,8 +153,8 @@ const fileUploadHandler = async (req: Request, res: Response) => {
       throw new AppError(400, "No file uploaded");
     }
 
-    const result = await uploadDocumentFile(userId, req.file);
-    res.status(200).json(result);
+    const result = await enqueueDocumentUpload(userId, req.file);
+    res.status(202).json(result);
   } catch (error) {
     handleControllerError(res, error);
   }

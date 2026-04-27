@@ -1,5 +1,3 @@
-import fs from "fs";
-import mammoth from "mammoth";
 import { Response } from "express";
 import cloudinary from "../Config/cloudinary";
 import User from "../Models/userModel";
@@ -10,9 +8,7 @@ import { MAX_TOKENS_PER_REQUEST } from "../Config/llm";
 import { applyEdits } from "../utils/applyEdits";
 import { sanitizeOperations } from "../utils/llmActions";
 import { AppError, isAppError } from "../utils/appError";
-// Add:
 import { openRouterStream, openRouterComplete } from "../service/openrouter";
-import { getEditOperations } from "../service/gemini";
 
 const extractJsonPayload = (rawResponse: string) => {
   const trimmed = rawResponse.trim();
@@ -82,7 +78,9 @@ export const createDocument = async (userId: string, title: string) => {
 };
 
 export const getDocumentList = async (userId: string) => {
-  return Document.find({ user_id: userId }).select("title createdAt");
+  return Document.find({ user_id: userId }).select(
+    "title createdAt uploadStatus uploadError sourceFileName"
+  );
 };
 
 export const getDocumentData = async (userId: string, fileId: string) => {
@@ -286,35 +284,6 @@ export const syncDocument = async (
       { title, content: JSON.stringify(newContent) },
       { new: true }
     );
-  }
-};
-
-export const uploadDocumentFile = async (
-  userId: string,
-  file: { path: string; originalname: string }
-) => {
-  const filePath = file.path;
-
-  try {
-    const fileContent = fs.readFileSync(filePath);
-    const { value: text } = await mammoth.extractRawText({ buffer: fileContent });
-
-    const newDocument = new Document({
-      user_id: userId,
-      title: file.originalname,
-      content: text,
-    });
-
-    await newDocument.save();
-
-    return {
-      success: true,
-      content: text,
-    };
-  } finally {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
   }
 };
 

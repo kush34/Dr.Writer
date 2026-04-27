@@ -1,4 +1,5 @@
 import apiClient from "@/service/axiosConfig";
+import { auth } from "@/firebaseAuth/firebaseConfig";
 import { JSONContent } from "@tiptap/core";
 
 export const fetchDocuments = async () => {
@@ -11,11 +12,53 @@ export const createDocument = async (title: string) => {
   return res.data;
 };
 
-export const uploadDocument = async (formData: any) => {
-  const res = await apiClient.post("/document/fileUpload", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+export const uploadDocument = async (
+  formData: FormData,
+  onProgress?: (progress: number) => void
+) => {
+  await auth.authStateReady();
+
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("You must be logged in to upload a document");
+  }
+
+  const token = await user.getIdToken();
+  const baseUrl = import.meta.env.VITE_Backend_URL;
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.open("POST", `${baseUrl}/document/fileUpload`);
+    xhr.responseType = "json";
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) {
+        return;
+      }
+
+      onProgress?.(Math.round((event.loaded / event.total) * 100));
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.response);
+        return;
+      }
+
+      reject(
+        new Error(
+          xhr.response?.message ||
+            xhr.response?.error ||
+            "Document upload failed"
+        )
+      );
+    };
+
+    xhr.onerror = () => reject(new Error("Document upload failed"));
+    xhr.send(formData);
   });
-  return res.data;
 };
 
 

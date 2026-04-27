@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createDocument, getUserInfo, uploadDocument } from "@/service/document";
+import { createDocument, uploadDocument } from "@/service/document";
 import { toast } from "sonner";
 
 const Home = () => {
@@ -35,10 +35,15 @@ const Home = () => {
 
   // UPLOAD DOC
   const uploadMutation = useMutation({
-    mutationFn: uploadDocument,
+    mutationFn: ({
+      formData,
+      onProgress,
+    }: {
+      formData: FormData;
+      onProgress?: (progress: number) => void;
+    }) => uploadDocument(formData, onProgress),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      toast.success("Success", { description: "File uploaded successfully" });
     },
   });
 
@@ -52,10 +57,47 @@ const Home = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const toastId = `document-upload-${Date.now()}`;
     const formData = new FormData();
     formData.append("file", file);
 
-    uploadMutation.mutate(formData);
+    toast.loading("Uploading document", {
+      id: toastId,
+      description: `${file.name} • 0%`,
+      duration: Infinity,
+    });
+
+    uploadMutation.mutate(
+      {
+        formData,
+        onProgress: (progress) => {
+          toast.loading("Uploading document", {
+            id: toastId,
+            description: `${file.name} • ${progress}%`,
+            duration: Infinity,
+          });
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.dismiss(toastId);
+          toast.success("Upload complete", {
+            description: `${file.name} was uploaded successfully`,
+          });
+        },
+        onError: (error) => {
+          toast.dismiss(toastId);
+          toast.error("Upload failed", {
+            description:
+              error instanceof Error
+                ? error.message
+                : "Unable to upload the selected file",
+          });
+        },
+      }
+    );
+
+    e.target.value = "";
   };
 
   return (
@@ -94,13 +136,16 @@ const Home = () => {
                 hidden
                 ref={hiddenFileInput}
                 accept=".doc,.docx"
-                onChange={(e) => handleFileUpload}
+                onChange={handleFileUpload}
               />
 
-              <Button onClick={() => {
-                if (hiddenFileInput && hiddenFileInput.current)
-                  hiddenFileInput.current.click()
-              }}>
+              <Button
+                disabled={uploadMutation.isPending}
+                onClick={() => {
+                  if (hiddenFileInput && hiddenFileInput.current)
+                    hiddenFileInput.current.click();
+                }}
+              >
                 Upload
               </Button>
             </DialogFooter>

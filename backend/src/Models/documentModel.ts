@@ -55,6 +55,19 @@ const documentSchema = new mongoose.Schema({
         type: [relatedImageSchema],
         default: [],
     },
+    uploadStatus: {
+        type: String,
+        enum: ["queued", "processing", "completed", "failed"],
+        default: "completed",
+    },
+    uploadError: {
+        type: String,
+        default: null,
+    },
+    sourceFileName: {
+        type: String,
+        default: null,
+    },
     createdAt: {
         type: Date,
         default: Date.now // Automatically set the current date/time
