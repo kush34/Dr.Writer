@@ -1,0 +1,9 @@
+#!/bin/sh
+
+echo "Building backend..."
+cd backend && npm run build || { echo "Backend build failed. Commit aborted."; exit 1; }
+
+cd ..
+
+echo "Building frontend..."
+cd frontend && npm run build || { echo "Frontend build failed. Commit aborted."; exit 1; }

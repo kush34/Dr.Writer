@@ -1,2 +1,4 @@
 .codex
 .claudecode
+node_modules
+.husky/_
