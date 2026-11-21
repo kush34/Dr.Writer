@@ -25,13 +25,13 @@ export const openRouterStream = async (
       stream: true,
     }),
   });
-  // console.log("KEY:", process.env.OPEN_ROUTER_API_KEY);
   if (response.status === 429) {
     throw new AppError(429, "Model is currently rate limited. Please try a different model or try again later.");
   }
-  if (!response.ok || !response.body) {
-    throw new Error(`OpenRouter error: ${response.status} ${await response.text()}`);
-  }
+  if (response.status === 404) throw new AppError(404, "This model is unavailable. Choose another model and retry.");
+  if (response.status === 401 || response.status === 403) throw new AppError(502, "The AI service rejected its credentials. Check the server configuration.");
+  if (response.status === 402) throw new AppError(502, "The AI service has insufficient credits. Choose a free model or check your OpenRouter balance.");
+  if (!response.ok || !response.body) throw new AppError(502, "The AI service is unavailable. Please try again.");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

@@ -22,12 +22,14 @@ const Home = () => {
   const queryClient = useQueryClient();
 
   const [newTitle, setNewTitle] = useState<string>("New Document");
+  const [dialogOpen, setDialogOpen] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement | null>(null);
 
   // CREATE DOC
   const createMutation = useMutation({
     mutationFn: createDocument,
     onSuccess: () => {
+      setDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["documents"] });
       toast.success("Created Doc", { description: "New document created" });
     },
@@ -104,7 +106,7 @@ const Home = () => {
     <Layout>
       <Files />
       <div className="flex justify-end mr-12">
-        <Dialog>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-primary">Add</Button>
           </DialogTrigger>
