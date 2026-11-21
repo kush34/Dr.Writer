@@ -8,7 +8,9 @@ import { MAX_TOKENS_PER_REQUEST } from "../Config/llm";
 import { applyEdits } from "../utils/applyEdits";
 import { sanitizeOperations } from "../utils/llmActions";
 import { AppError, isAppError } from "../utils/appError";
-import { openRouterStream, openRouterComplete } from "../service/openrouter";
+import { openRouterStream, openRouterComplete, openRouterWithTools } from "../service/openrouter";
+import { getMcpConfig } from "../service/mcpConfig";
+import { connectMcpServers } from "../service/mcpClient";
 
 const extractJsonPayload = (rawResponse: string) => {
   const trimmed = rawResponse.trim();
@@ -211,7 +213,19 @@ export const streamUserPrompt = async (
   modelName: string,
   res: Response
 ) => {
+  let reserved = false;
+  let reservedTokens = 0;
+  let closeMcp: (() => Promise<void>) | undefined;
+  let toolAttempts = 0;
+  let toolMode = false;
+  let modelTokens = 0;
+  const settle = async (tokens: number) => {
+    if (!reserved) return;
+    await User.updateOne({ _id: userId }, { $inc: { token_balance: reservedTokens - tokens } });
+    reserved = false;
+  };
   try {
+    await getDocumentData(userId, documentId);
     let tokenCount = 0;
     const reservedUser = await User.findOneAndUpdate(
       { _id: userId, token_balance: { $gte: MAX_TOKENS_PER_REQUEST } },
@@ -222,6 +236,48 @@ export const streamUserPrompt = async (
     if (!reservedUser) {
       throw new AppError(402, "Insufficient token balance");
     }
+    reserved = true;
+    reservedTokens = MAX_TOKENS_PER_REQUEST;
+    const config = await getMcpConfig(userId);
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("X-Accel-Buffering", "no");
+    const finish = async (fullResponse: string, toolCount = 0) => {
+      tokenCount = toolMode ? modelTokens : Math.ceil(fullResponse.length / 4);
+      await Chat.create({ documentId, prompt: userPrompt, response: fullResponse, toolCount });
+      await settle(tokenCount);
+      res.write(`data: ${JSON.stringify({ type: "done", usageToken: tokenCount, toolCount })}\n\n`);
+      res.end();
+    };
+    if (Object.keys(config.mcpServers).length) {
+      const connection = await connectMcpServers(config);
+      closeMcp = connection.close;
+      if (connection.unavailable.length) {
+        res.write(`data: ${JSON.stringify({ type: "mcp_warning", servers: connection.unavailable })}\n\n`);
+      }
+      if (connection.tools.length) {
+        toolMode = true;
+        const result = await openRouterWithTools(userPrompt, modelName, connection.tools, (server, tool) => {
+          toolAttempts++;
+          res.write(`data: ${JSON.stringify({ type: "tool", server, tool })}\n\n`);
+        }, (tokens) => {
+          modelTokens += tokens;
+        }, async (tokens) => {
+          const additional = modelTokens + tokens - reservedTokens;
+          if (additional <= 0) return;
+          const user = await User.findOneAndUpdate(
+            { _id: userId, token_balance: { $gte: additional } },
+            { $inc: { token_balance: -additional } },
+            { new: true }
+          );
+          if (!user) throw new AppError(402, "Insufficient token balance for the next model request.");
+          reservedTokens += additional;
+        });
+        res.write(`data: ${JSON.stringify({ chunk: result.text })}\n\n`);
+        await finish(result.text, result.count);
+        return;
+      }
+    }
     await openRouterStream(
       userPrompt,
       modelName,
@@ -229,40 +285,25 @@ export const streamUserPrompt = async (
       (text) => {
         res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
       },
-      async (fullResponse) => {
-        // Rough token estimate — OpenRouter doesn't always return usage in stream
-        tokenCount = Math.ceil(fullResponse.length / 4);
-        const refund = MAX_TOKENS_PER_REQUEST - tokenCount;
-
-        if (refund > 0) {
-          await User.updateOne({ _id: userId }, { $inc: { token_balance: refund } });
-        }
-
-        await Chat.create({
-          documentId,
-          prompt: userPrompt,
-          response: fullResponse,
-          tokensUsed: tokenCount,
-        });
-
-        res.write(`data: ${JSON.stringify({ type: "done", usageToken: tokenCount })}\n\n`);
-        res.end();
-      }
+      finish
     );
   } catch (error) {
     console.error("OpenRouter stream error:", error);
-    await User.updateOne({ _id: userId }, { $inc: { token_balance: MAX_TOKENS_PER_REQUEST } });
+    await settle(toolMode ? modelTokens : 0);
 
     const statusCode = isAppError(error) ? error.statusCode : 500;
     const message = isAppError(error) ? error.message : "LLM stream failed";
-    const payload = { error: message, statusCode };
+    const payload = { error: message, statusCode, retryable: toolAttempts === 0 };
 
     if (!res.headersSent) {
+      res.removeHeader("Content-Type");
       return res.status(statusCode).json(payload);
     }
 
     res.write(`data: ${JSON.stringify(payload)}\n\n`);
     res.end();
+  } finally {
+    await closeMcp?.();
   }
 };
 
@@ -287,7 +328,8 @@ export const syncDocument = async (
   }
 };
 
-export const getDocumentChats = async (documentId: string) => {
+export const getDocumentChats = async (userId: string, documentId: string) => {
+  await getDocumentData(userId, documentId);
   return Chat.find({ documentId });
 };
 

@@ -1,1 +1,2 @@
-export const MAX_TOKENS_PER_REQUEST = 2_000;
+export const MAX_TOKENS_PER_REQUEST = 20_000;
+export const USER_TOKEN_ALLOWANCE = 250_000;

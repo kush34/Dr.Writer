@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { USER_TOKEN_ALLOWANCE } from "../Config/llm";
 
 const userSchema = new mongoose.Schema({
     name: {
@@ -15,7 +16,10 @@ const userSchema = new mongoose.Schema({
     },
     token_balance:{
         type:Number,
-    }
+        default: USER_TOKEN_ALLOWANCE,
+    },
+    token_allowance_version: { type: Number, default: 3 },
+    mcp_config: { type: String, select: false }
 })
 
 const User = mongoose.model('User', userSchema);

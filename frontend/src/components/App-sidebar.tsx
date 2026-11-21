@@ -31,6 +31,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { useQuery } from "@tanstack/react-query";
 import { getUserInfo } from "@/service/document";
 import { MAX_TOKENS } from "@/config/llm";
+import { useState } from "react";
+import { McpSettings } from "./McpSettings";
 
 // Menu items.
 const items = [
@@ -62,6 +64,7 @@ const items = [
 ];
 
 export function AppSidebar() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { theme } = useTheme();
   const { user, loading } = useUser();
   const { data, isLoading, error } = useQuery({
@@ -97,12 +100,12 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  {item.title === "Settings" ? <SidebarMenuButton onClick={() => setSettingsOpen(true)}><item.icon /><span>Settings</span></SidebarMenuButton> : <SidebarMenuButton asChild>
                     <a href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
                     </a>
-                  </SidebarMenuButton>
+                  </SidebarMenuButton>}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -161,7 +164,7 @@ export function AppSidebar() {
                     Billing
                     <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
                     Settings
                     <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
                   </DropdownMenuItem>
@@ -203,6 +206,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarContent>
       </SidebarFooter>
+      <McpSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Sidebar>
   );
 }

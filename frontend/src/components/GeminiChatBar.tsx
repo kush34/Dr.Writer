@@ -13,6 +13,8 @@ import apiClient from "@/service/axiosConfig";
 import { getAuth } from "firebase/auth";
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export interface tChat {
   prompt: string
@@ -22,6 +24,10 @@ export interface tChat {
   updatedAt: string
   error?: string
   streaming?: boolean
+  toolCount?: number
+  toolActivity?: { server: string; tool: string }[]
+  mcpWarnings?: string[]
+  retryable?: boolean
 }
 
 type DocumentChatResponse = {
@@ -124,16 +130,26 @@ function GeminiChatPanel({
                   </div>
                   {time(item.createdAt)}
                 </div>
+                {!!item.mcpWarnings?.length && <div role="status" className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-950">Unavailable MCP servers: {item.mcpWarnings.join(", ")}. The answer may not use these tools.</div>}
                 {item.error ? (
                   <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">
                     <p>{item.error}</p>
-                    <button className="mt-2 font-semibold underline disabled:opacity-50" disabled={geminiLoading} onClick={() => retrySend(index)}>Retry</button>
+                    {item.retryable !== false ? <button className="mt-2 font-semibold underline disabled:opacity-50" disabled={geminiLoading} onClick={() => retrySend(index)}>Retry</button> : <p className="mt-2">Check whether any tool made changes before submitting again.</p>}
                   </div>
                 ) : <div className="flex flex-col items-end gap-1">
-                  <div className="max-w-[80%] whitespace-pre-wrap rounded-md bg-green-400 p-3 text-sm text-black">
-                    {item.response || "▍"}
+                  {item.streaming && item.toolActivity?.map((activity, i) => (
+                    <div key={i} className="text-xs text-muted-foreground" role="status">Using {activity.server}: {activity.tool}</div>
+                  ))}
+                  <div className="min-w-0 max-w-full overflow-hidden rounded-md bg-green-400 p-3 text-sm text-black [&_a]:break-all [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-black/40 [&_blockquote]:pl-3 [&_code]:break-words [&_code]:rounded [&_code]:bg-black/10 [&_code]:px-1 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_h3]:font-semibold [&_li]:ml-4 [&_ol]:list-decimal [&_p+p]:mt-2 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-black/10 [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_ul]:list-disc">
+                    {item.response ? <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={["img"]} components={{
+                      table: ({ children }) => <div className="my-2 max-w-full overflow-x-auto"><table className="min-w-max border-collapse text-left">{children}</table></div>,
+                      th: ({ children }) => <th className="border border-black/30 px-2 py-1 align-top">{children}</th>,
+                      td: ({ children }) => <td className="max-w-xs whitespace-normal border border-black/30 px-2 py-1 align-top">{children}</td>,
+                      a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
+                    }}>{item.response}</ReactMarkdown> : "▍"}
                   </div>
                   {!item.streaming && item.response && time(item.updatedAt)}
+                  {!item.streaming && item.response && item.toolCount !== undefined && <span className="text-xs text-muted-foreground">{item.toolCount} {item.toolCount === 1 ? "tool call" : "tool calls"}</span>}
                 </div>}
                 {!item.error && item.response && (
                 <div className="flex justify-end text-sm">
@@ -266,16 +282,20 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
       return { ...old, documentChat: chats };
     });
 
+    let retryable = true;
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error("Your session has expired. Please sign in again.");
+      retryable = false;
       const res = await fetch(`${import.meta.env.VITE_Backend_URL}/document/userprompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ userPrompt: currentPrompt, documentId, modelName: currentModel })
       });
       if (!res.ok) {
+        retryable = true;
         const body = await res.json().catch(() => null);
+        if (body?.retryable === false) retryable = false;
         throw new Error(body?.error || "Could not get a response. Please try again.");
       }
       if (!res.body) throw new Error("Could not start the response. Please try again.");
@@ -284,6 +304,7 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
       const decoder = new TextDecoder("utf-8");
       let buffer = "";
       let responseText = "";
+      const toolActivity: { server: string; tool: string }[] = [];
 
       while (true) {
         const { value, done } = await reader.read();
@@ -294,10 +315,15 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
         for (const event of events) {
           if (!event.startsWith("data: ")) continue;
           const payload = JSON.parse(event.replace("data: ", ""));
-          if (payload.error) throw new Error(payload.error);
+          if (payload.error) { retryable = payload.retryable === true && toolActivity.length === 0; throw new Error(payload.error); }
+          if (payload.type === "mcp_warning") updateChat({ mcpWarnings: payload.servers });
+          if (payload.type === "tool") {
+            toolActivity.push({ server: payload.server, tool: payload.tool });
+            updateChat({ toolActivity: [...toolActivity] });
+          }
           if (payload.type === "done") {
             console.log("Usage tokens:", payload.usageToken);
-            updateChat({ streaming: false, updatedAt: new Date().toISOString() });
+            updateChat({ streaming: false, toolCount: payload.toolCount, updatedAt: new Date().toISOString() });
             return;
           }
           if (payload.chunk) {
@@ -307,7 +333,7 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
         }
       }
     } catch (err) {
-      updateChat({ streaming: false, error: err instanceof TypeError ? "Could not connect. Check your connection and retry." : err instanceof Error ? err.message : "Could not get a response. Please try again." });
+      updateChat({ streaming: false, retryable, error: err instanceof TypeError ? "Could not connect. Check your connection." : err instanceof Error ? err.message : "Could not get a response." });
     } finally {
       setGeminiLoading(false);
     }

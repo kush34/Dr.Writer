@@ -163,7 +163,7 @@ const fileUploadHandler = async (req: Request, res: Response) => {
 const getChatsHandler = async (req: Request, res: Response) => {
   try {
     const { documentId } = getChatsParamsSchema.parse(req.params);
-    const documentChat = await getDocumentChats(documentId);
+    const documentChat = await getDocumentChats(requireAuthenticatedUser(req), documentId);
     res.status(200).send({ documentChat });
   } catch (error) {
     handleControllerError(res, error);
