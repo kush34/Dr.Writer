@@ -36,6 +36,9 @@ const relatedImageSchema = new mongoose.Schema(
 );
 
 const documentSchema = new mongoose.Schema({
+    kind: { type: String, enum: ["document", "presentation"], default: "document" },
+    pptx: String,
+    revision: { type: Number, default: 0 },
     title: {
         type: String,
         default: 'document'

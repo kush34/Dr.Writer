@@ -2,6 +2,7 @@ import { createContext, useContext } from "react";
 import type { Editor } from "@tiptap/react";
 
 type tSharedEditorContext = {
+  presentation?: React.MutableRefObject<((command: string, model: string) => Promise<void>) | null>
   editor: Editor | null
   setEditor: React.Dispatch<React.SetStateAction<Editor | null>>
 }

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 export type tFile = {
   _id: string;
   title: string;
+  kind?: string;
   preview?: string;
   editedAt?: string;
   createdAt?: string;
@@ -17,7 +18,7 @@ export default function FileCard({ file, view }: { file: tFile; view: "card" | "
   const date = timestamp ? new Date(timestamp) : null;
   const content = <>
     {view === "card" ? <div className="h-36 overflow-hidden rounded-t-lg border-b bg-background p-2 text-[8px] leading-relaxed text-foreground" aria-hidden="true">
-      <strong className="mb-2 block truncate text-[9px]">{file.title}</strong>{file.preview || <span className="text-muted-foreground">Empty document</span>}
+      <strong className="mb-2 block truncate text-[9px]">{file.title}</strong>{file.kind === "presentation" ? "PowerPoint presentation" : file.preview || <span className="text-muted-foreground">Empty document</span>}
     </div> : <FileText className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />}
     <div className={view === "card" ? "p-3" : "min-w-0 flex-1"}>
       <div className="truncate font-medium">{file.title}</div>

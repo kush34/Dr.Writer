@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +12,8 @@ import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { DocumentDTO } from "@/types";
 import { EditorSkeleton } from "@/components/PageSkeleton";
+
+const PresentationEditor = lazy(() => import("./PresentationEditor"));
 
 const normalizeContent = (content: any): JSONContent => {
   if (typeof content === "object" && content?.type === "doc") return content;
@@ -46,7 +49,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
 
       return {
         ...doc,
-        content: normalizeContent(doc.content),
+        content: doc.kind === "presentation" ? doc.content : normalizeContent(doc.content),
       };
     },
   });
@@ -76,6 +79,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
   if (!user) return <p>User not logged in</p>;
   if (error) return <p>Failed to load document</p>;
   if (!data) return <p>No document data</p>;
+  if (data.kind === "presentation") return <Suspense fallback={<EditorSkeleton />}><PresentationEditor key={id} id={id} title={data.title} pptx={data.pptx} revision={data.revision ?? 0} /></Suspense>;
   return (
     <div className="Editor flex h-full min-h-0 w-full min-w-0 overflow-hidden">
       <SimpleEditor key={id} title={data.title} content={data.content} onEditorReady={onEditorReady} updateDocument={updateDocument} />

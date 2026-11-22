@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getChatsForDocument } from "@/service/document";
 import { useSharedEditor } from "@/context/EditorContext";
 import apiClient from "@/service/axiosConfig";
+import { isAxiosError } from "axios";
 import { getAuth } from "firebase/auth";
 import { toast } from "sonner";
 import { availableModels, getDefaultModel } from "@/config/models";
@@ -242,7 +243,7 @@ function GeminiChatPanel({
 
 export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docMode, setDocMode, citation, setCitation }: GeminiChatBarProps) {
   const { user, loading } = useUser();
-  const { editor } = useSharedEditor();
+  const { editor, presentation } = useSharedEditor();
   const auth = getAuth();
   const [prompt, setPrompt] = useState<string>('');
   const [geminiLoading, setGeminiLoading] = useState<boolean>(false);
@@ -260,7 +261,30 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
   });
 
   const handleActions = async () => {
-    if (!editor?.commands || !prompt.trim() || geminiLoading) return;
+    if (!prompt.trim() || geminiLoading) return;
+    if (presentation?.current) {
+      setGeminiLoading(true);
+      setDocStatus("Editing slides…");
+      try {
+        await presentation.current(prompt, currentModel);
+        setPrompt(current => current === prompt ? "" : current);
+        queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => ({
+          ...(old ?? { documentChat: [] }),
+          documentChat: [
+            ...(old?.documentChat ?? []),
+            { prompt, response: "Slides updated. Save to keep your changes.", documentId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          ],
+        }));
+        setDocStatus("Slides updated. Save to keep your changes.");
+        toast.success("Slides updated");
+      } catch (error) {
+        const message = isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "Could not edit slides.";
+        setDocStatus(message);
+        toast.error(message);
+      } finally { setGeminiLoading(false); }
+      return;
+    }
+    if (!editor?.commands) { toast.error("Wait for the editor to open."); return; }
     setGeminiLoading(true);
     setDocStatus("Applying changes…");
 

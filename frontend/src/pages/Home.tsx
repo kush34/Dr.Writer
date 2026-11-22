@@ -25,6 +25,7 @@ const Home = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [newTitle, setNewTitle] = useState<string>("New Document");
+  const [kind, setKind] = useState<"document" | "presentation">("document");
   const [dialogOpen, setDialogOpen] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
@@ -43,7 +44,7 @@ const Home = () => {
   // CREATE DOC
   const createMutation = useMutation({
     mutationFn: createDocument,
-    onMutate: async (title) => {
+    onMutate: async ({ title }) => {
       const id = `pending-${crypto.randomUUID()}`;
       await addPending(id, title);
       setDialogOpen(false);
@@ -81,7 +82,7 @@ const Home = () => {
 
   const handleAdd = () => {
     if (!newTitle.trim()) { toast.error("Enter a document title"); return; }
-    createMutation.mutate(newTitle.trim());
+    createMutation.mutate({ title: newTitle.trim(), kind });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,6 +149,9 @@ const Home = () => {
             </DialogHeader>
 
             <div className="grid gap-4 py-4">
+              <label>File type <select value={kind} onChange={e => setKind(e.target.value as typeof kind)}>
+                <option value="document">Document</option><option value="presentation">PowerPoint presentation</option>
+              </select></label>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right">Title</Label>
                 <Input
@@ -167,7 +171,7 @@ const Home = () => {
                 type="file"
                 hidden
                 ref={hiddenFileInput}
-                accept=".doc,.docx"
+                accept=".doc,.docx,.pptx"
                 onChange={handleFileUpload}
               />
 

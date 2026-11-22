@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  optimizeDeps: { include: ["docx"] },
+  optimizeDeps: { esbuildOptions: { target: "es2022" }, include: ["docx"] },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -14,6 +14,7 @@ export default defineConfig({
   },
   // vite.config.ts
   build: {
+    target: "es2022",
     rollupOptions: {
       output: {
         manualChunks: {

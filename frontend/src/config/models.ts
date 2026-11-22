@@ -1,12 +1,13 @@
 export const availableModels = [
   "openrouter/free",
-  "google/gemma-3-27b-it:free",
-  "openai/gpt-oss-120b:free",
-  "openai/gpt-oss-20b:free",
-  "qwen/qwen3-coder:free",
-  "nvidia/nemotron-3-super-120b-a12b:free",
   "google/gemma-4-31b-it:free",
-  "nvidia/nemotron-nano-12b-v2-vl:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3.5-super-vl:free",
+  "nvidia/nemotron-3.5-lightning:free",
+  "recursive/flint-v1.0:free",
+  "inclusionai/ling-3.2-flash:free",
+  "baidu/ernie-5.5-flash-preview:free",
 ];
 
 const defaultModelKey = "drwriter.defaultModel";

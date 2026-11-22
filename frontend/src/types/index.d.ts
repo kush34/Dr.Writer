@@ -12,6 +12,9 @@ export type RelatedImageDTO = {
 };
 
 export type DocumentDTO = {
+  kind?: "presentation" | "document";
+  pptx?: string;
+  revision?: number;
   _id: string;
   title: string;
   content: JSONContent;
