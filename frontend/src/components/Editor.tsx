@@ -47,13 +47,23 @@ const Editor = ({ onEditorReady }: EditorProps) => {
 
   const updateMutation = useMutation({
     mutationFn: updateDocumentApi,
-    onSuccess: () => {
-      toast.success("Saved", { description: "Changes saved" });
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["documents"] });
+      queryClient.setQueryData(["documents"], (old: any) => old && ({ ...old, documents: old.documents.map((item: any) => item._id === variables.id ? { ...item, title: variables.title } : item) }));
+      return { toastId: toast.loading("Saving document…") };
+    },
+    onSuccess: (_result, _variables, context) => {
+      toast.success("Document saved", { id: context?.toastId });
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
-    onError: async (_, variables) => {
-      await addDocument({ _id: variables.id, title: variables.title, newContent: variables.content });
-      toast.success("Saved", { description: "Saved offline" });
+    onError: async (_, variables, context) => {
+      try {
+        await addDocument({ _id: variables.id, title: variables.title, newContent: variables.content });
+        toast.warning("Saved offline", { id: context?.toastId, description: "Changes will sync when you reconnect." });
+      } catch {
+        toast.error("Could not save document", { id: context?.toastId });
+        queryClient.invalidateQueries({ queryKey: ["documents"] });
+      }
     },
   });
 

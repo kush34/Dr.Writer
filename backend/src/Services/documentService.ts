@@ -80,9 +80,21 @@ export const createDocument = async (userId: string, title: string) => {
 };
 
 export const getDocumentList = async (userId: string) => {
-  return Document.find({ user_id: userId }).select(
-    "title createdAt uploadStatus uploadError sourceFileName"
-  );
+  const documents = await Document.find({ user_id: userId }).select(
+    "title content createdAt uploadStatus uploadError sourceFileName"
+  ).lean();
+  const previewText = (content: unknown): string => {
+    if (typeof content === "string") return content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+    const words: string[] = [];
+    const visit = (node: any) => {
+      if (!node || words.join(" ").length >= 300) return;
+      if (typeof node.text === "string") words.push(node.text);
+      if (Array.isArray(node.content)) node.content.forEach(visit);
+    };
+    visit(content);
+    return words.join(" ").slice(0, 300);
+  };
+  return documents.map(({ content, ...document }) => ({ ...document, preview: previewText(content) }));
 };
 
 export const getDocumentData = async (userId: string, fileId: string) => {

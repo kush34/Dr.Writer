@@ -29,17 +29,17 @@ function ShareFileDialog() {
       });
       return;
     }
-    const response = await apiClient.post('/document/adduser', {
-      file_id: id.id,
-      userToAddMail,
-    })
-    console.log(response);
-    if (response.status == 200) {
-      toast.success("Added Email", {
-        description: `User Added : ${userToAddMail}`,
-      });
+    const email = userToAddMail.trim();
+    setDialogFlag(false);
+    const toastId = toast.loading("Sharing document…");
+    try {
+      await apiClient.post('/document/adduser', { file_id: id.id, userToAddMail: email });
+      setUserToAddMail('');
+      toast.success("Document shared", { id: toastId, description: email });
+    } catch {
+      setDialogFlag(true);
+      toast.error("Could not share document", { id: toastId });
     }
-    setDialogFlag(false)
   }
   return (
     <Dialog open={dialogFlag} onOpenChange={setDialogFlag}>
@@ -61,7 +61,7 @@ function ShareFileDialog() {
             <Input
               id="name"
               onChange={(e) => setUserToAddMail(e.target.value)}
-              className="col-span-3 text-black"
+              className="col-span-3"
               placeholder='enter mail of user to add'
             />
           </div>

@@ -25,13 +25,27 @@ const Home = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement | null>(null);
 
+  const addPending = async (id: string, title: string) => {
+    await queryClient.cancelQueries({ queryKey: ["documents"] });
+    queryClient.setQueryData(["documents"], (old: any) => ({ ...old, documents: [{ _id: id, title, pending: true }, ...(old?.documents ?? [])] }));
+  };
+  const replacePending = (id: string, document?: any) => queryClient.setQueryData(["documents"], (old: any) => ({ ...old, documents: (old?.documents ?? []).flatMap((item: any) => item._id === id ? (document ? [document] : []) : [item]) }));
+
   // CREATE DOC
   const createMutation = useMutation({
     mutationFn: createDocument,
-    onSuccess: () => {
+    onMutate: async (title) => {
+      const id = `pending-${crypto.randomUUID()}`;
+      await addPending(id, title);
       setDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
-      toast.success("Created Doc", { description: "New document created" });
+      const toastId = toast.loading("Creating document…");
+      return { id, toastId };
+    },
+    onSuccess: (result, _title, context) => {
+      if (context) { replacePending(context.id, result.document); toast.success("Document created", { id: context.toastId }); }
+    },
+    onError: (_error, _title, context) => {
+      if (context) { replacePending(context.id); toast.error("Could not create document", { id: context.toastId }); }
     },
   });
 
@@ -44,15 +58,21 @@ const Home = () => {
       formData: FormData;
       onProgress?: (progress: number) => void;
     }) => uploadDocument(formData, onProgress),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    onMutate: async ({ formData }) => {
+      const file = formData.get("file") as File;
+      const id = `pending-${crypto.randomUUID()}`;
+      await addPending(id, file.name);
+      setDialogOpen(false);
+      return { id };
     },
+    onSuccess: (result: any, _variables, context) => { if (context) replacePending(context.id, result.document); },
+    onError: (_error, _variables, context) => { if (context) replacePending(context.id); },
   });
 
 
   const handleAdd = () => {
-    if (!newTitle.trim()) return;
-    createMutation.mutate(newTitle);
+    if (!newTitle.trim()) { toast.error("Enter a document title"); return; }
+    createMutation.mutate(newTitle.trim());
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,8 +103,8 @@ const Home = () => {
       {
         onSuccess: () => {
           toast.dismiss(toastId);
-          toast.success("Upload complete", {
-            description: `${file.name} was uploaded successfully`,
+          toast.success("Upload received", {
+            description: `${file.name} is being imported`,
           });
         },
         onError: (error) => {
@@ -123,7 +143,7 @@ const Home = () => {
                 <Input
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="col-span-3 text-black"
+                  className="col-span-3"
                 />
               </div>
             </div>

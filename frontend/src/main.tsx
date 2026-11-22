@@ -9,6 +9,7 @@ import { UserContextProvider } from './context/UserContext';
 
 // Lazy imports
 const App = lazy(() => import('./App'));
+const Settings = lazy(() => import('./pages/Settings'));
 const Home = lazy(() => import('./pages/Home'));
 const EditorPage = lazy(() => import('./pages/EditorPage'));
 const Landing = lazy(() => import('@/pages/Landing'));
@@ -43,6 +44,7 @@ if (root) {
                 <Route path="/login" element={<App />} />
                 <Route element={<ThemedRoutes />}>
                   <Route path="/home" element={<Home />} />
+                  <Route path="/settings" element={<Settings />} />
                   <Route path="/home/:id" element={<EditorPage />} />
                 </Route>
               </Routes>

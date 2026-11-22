@@ -25,20 +25,19 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useUser } from "@/context/UserContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuPortal, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
 import { getUserInfo } from "@/service/document";
 import { MAX_TOKENS } from "@/config/llm";
-import { useState } from "react";
-import { McpSettings } from "./McpSettings";
+
 
 // Menu items.
 const items = [
   {
     title: "Home",
-    url: "#",
+    url: "/home",
     icon: Home,
   },
   {
@@ -63,8 +62,7 @@ const items = [
   },
 ];
 
-export function AppSidebar() {
-  const [settingsOpen, setSettingsOpen] = useState(false);
+export function AppSidebar({ side = "left" }: { side?: "left" | "right" }) {
   const { theme } = useTheme();
   const { user, loading } = useUser();
   const { data, isLoading, error } = useQuery({
@@ -92,7 +90,7 @@ export function AppSidebar() {
   if (!user) return <p>User not logged in</p>;
 
   return (
-    <Sidebar>
+    <Sidebar side={side}>
       <SidebarContent className={`border-none!`}>
         <SidebarGroup>
           <SidebarGroupLabel className="my-5 text-xl">Dr. Writer</SidebarGroupLabel>
@@ -100,7 +98,9 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  {item.title === "Settings" ? <SidebarMenuButton onClick={() => setSettingsOpen(true)}><item.icon /><span>Settings</span></SidebarMenuButton> : <SidebarMenuButton asChild>
+                  {item.title === "Settings" ? <SidebarMenuButton onClick={() => navigate("/settings")}><item.icon /><span>Settings</span></SidebarMenuButton> : item.title === "Home" ? <SidebarMenuButton asChild>
+                    <Link to={item.url}><item.icon /><span>{item.title}</span></Link>
+                  </SidebarMenuButton> : <SidebarMenuButton asChild>
                     <a href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -164,7 +164,7 @@ export function AppSidebar() {
                     Billing
                     <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                  <DropdownMenuItem onSelect={() => navigate("/settings")}>
                     Settings
                     <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
                   </DropdownMenuItem>
@@ -206,7 +206,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarContent>
       </SidebarFooter>
-      <McpSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Sidebar>
   );
 }
