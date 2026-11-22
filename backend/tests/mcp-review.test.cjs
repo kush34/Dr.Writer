@@ -214,3 +214,30 @@ test("simultaneous server updates preserve both encrypted configurations", async
     if (originalKey === undefined) delete process.env.MCP_ENCRYPTION_KEY; else process.env.MCP_ENCRYPTION_KEY = originalKey;
   }
 });
+
+test("tool-enabled replies forward streamed text and assemble fragmented tool calls", async () => {
+  const originalFetch = global.fetch;
+  let round = 0;
+  const chunks = [];
+  const events = [];
+  global.fetch = async () => {
+    round++;
+    const packets = round === 1 ? [
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: "call-1", function: { name: "mcp_0", arguments: '{"q":' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '"news"}' } }] }, finish_reason: "tool_calls" }] },
+    ] : [
+      { choices: [{ delta: { content: "Hello " } }] },
+      { choices: [{ delta: { content: "world" }, finish_reason: "stop" }] },
+    ];
+    packets.push({ usage: { total_tokens: 20, completion_tokens: 3 }, choices: [] });
+    return new Response(packets.map(packet => `data: ${JSON.stringify(packet)}\n\n`).join("") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } });
+  };
+  try {
+    const tools = [{ modelName: "mcp_0", server: "exa", tool: { name: "search", inputSchema: {} }, client: { callTool: async ({ arguments: args }) => { assert.deepEqual(args, { q: "news" }); return { content: [] }; } } }];
+    const result = await openRouterWithTools("test", "model", tools, (_server, _tool, phase) => events.push(phase), () => {}, async () => {}, chunk => chunks.push(chunk));
+    assert.deepEqual(events, ["start", "done"]);
+    assert.deepEqual(chunks, ["Hello ", "world"]);
+    assert.equal(result.text, "Hello world");
+    assert.equal(result.streamed, true);
+  } finally { global.fetch = originalFetch; }
+});

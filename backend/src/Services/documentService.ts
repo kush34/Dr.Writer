@@ -305,7 +305,8 @@ export const streamUserPrompt = async (
     }
     reserved = true;
     reservedTokens = MAX_TOKENS_PER_REQUEST;
-    const config = await getMcpConfig(userId);
+    const userConfig = await getMcpConfig(userId);
+    const config = { mcpServers: { ...userConfig.mcpServers, drwriter_exa: { url: "https://mcp.exa.ai/mcp", displayName: "Exa web search" } } };
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("X-Accel-Buffering", "no");
@@ -324,9 +325,10 @@ export const streamUserPrompt = async (
       }
       if (connection.tools.length) {
         toolMode = true;
-        const result = await openRouterWithTools(userPrompt, modelName, connection.tools, (server, tool) => {
-          toolAttempts++;
-          res.write(`data: ${JSON.stringify({ type: "tool", server, tool, displayName: config.mcpServers[server]?.displayName, icon: config.mcpServers[server]?.icon })}\n\n`);
+        const result = await openRouterWithTools(userPrompt, modelName, connection.tools, (server, tool, phase) => {
+          if (phase === "start") toolAttempts++;
+          const settings = config.mcpServers[server as keyof typeof config.mcpServers];
+          res.write(`data: ${JSON.stringify({ type: "tool", server, tool, phase, displayName: settings?.displayName, icon: "icon" in (settings || {}) ? (settings as { icon?: string }).icon : undefined })}\n\n`);
         }, (tokens) => {
           modelTokens += tokens;
         }, async (tokens) => {
@@ -339,8 +341,10 @@ export const streamUserPrompt = async (
           );
           if (!user) throw new AppError(402, "Insufficient token balance for the next model request.");
           reservedTokens += additional;
-        });
-        res.write(`data: ${JSON.stringify({ chunk: result.text })}\n\n`);
+        }, (chunk) => res.write(`data: ${JSON.stringify({ chunk })}\n\n`),
+        () => res.write(`data: ${JSON.stringify({ type: "reset" })}\n\n`));
+        // Providers that return JSON despite stream=true have not emitted chunks.
+        if (!result.streamed) res.write(`data: ${JSON.stringify({ chunk: result.text })}\n\n`);
         await finish(result.text, result.count);
         return;
       }
@@ -398,7 +402,13 @@ export const syncDocument = async (
 
 export const getDocumentChats = async (userId: string, documentId: string) => {
   await getDocumentData(userId, documentId);
-  return Chat.find({ documentId });
+  return Chat.find({ documentId }).sort({ createdAt: 1, _id: 1 });
+};
+
+export const saveActionHistory = async (userId: string, documentId: string, prompt: string, response: string) => {
+  const document = await findDocumentOrThrow(documentId);
+  if (!isDocumentOwner(userId, document.user_id)) throw new AppError(403, "Document not found");
+  return Chat.create({ documentId, prompt, response });
 };
 
 const assertCloudinaryConfigured = () => {

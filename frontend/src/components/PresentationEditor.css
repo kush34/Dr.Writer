@@ -16,3 +16,29 @@
   width: min(220px, calc(100% - 24px));
   margin: 0 18px 12px auto;
 }
+
+@media (max-width: 1349px) {
+  .presentation-editor--dock .pptx-default__workspace {
+    padding-bottom: 140px;
+  }
+}
+
+@media (min-width: 1350px) {
+  div:has(.presentation-editor--dock) > #editor-chat-panel {
+    width: min(720px, calc(100% - 920px));
+  }
+
+  .presentation-editor .presentation-notes[data-open="false"] {
+    position: absolute;
+    right: 18px;
+    bottom: 16px;
+    z-index: 26;
+    width: 220px;
+    margin: 0;
+  }
+
+  .presentation-editor .pptx-default__views:has(.presentation-notes[data-open="false"]) > .pptx-statusbar {
+    right: 246px;
+    bottom: 16px;
+  }
+}

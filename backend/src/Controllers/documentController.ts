@@ -18,12 +18,14 @@ import {
   streamUserPrompt,
   syncDocument,
   savePresentation,
+  saveActionHistory,
   updateDocument,
 } from "../Services/documentService";
 import { AppError } from "../utils/appError";
 import { handleControllerError } from "../utils/controllerErrorHandler";
 import {
   addUserSchema,
+  actionHistorySchema,
   createDocumentImageSignatureSchema,
   createDocumentSchema,
   documentActionBodySchema,
@@ -243,6 +245,14 @@ export const registerDocumentRoutes = (router: Router) => {
     firebaseTokenVerify,
     performDocumentActionHandler
   );
+  router.post("/actions/:documentId/history", firebaseTokenVerify, async (req, res) => {
+    try {
+      const { documentId } = documentActionParamsSchema.parse(req.params);
+      const { prompt, response } = actionHistorySchema.parse(req.body);
+      const chat = await saveActionHistory(requireAuthenticatedUser(req), documentId, prompt, response);
+      res.status(201).json({ chat });
+    } catch (error) { handleControllerError(res, error); }
+  });
   router.post(
     "/userprompt",
     geminiLimiter,

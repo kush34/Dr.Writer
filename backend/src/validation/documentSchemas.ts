@@ -61,6 +61,11 @@ export const documentActionBodySchema = z.object({
   modelName: z.string().optional(),
 });
 
+export const actionHistorySchema = z.object({
+  prompt: z.string().trim().min(1).max(20000),
+  response: z.string().trim().min(1).max(20000),
+}).strict();
+
 export const userPromptSchema = z.object({
   userPrompt: z.string().trim().min(1),
   documentId: z.string().trim().min(1),

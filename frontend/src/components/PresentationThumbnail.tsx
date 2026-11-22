@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Presentation } from "lucide-react";
 import { fetchDocumentData } from "@/service/document";
+import blank from "../assets/blank.pptx?url&inline";
 
 const PresentationThumbnailCanvas = lazy(() => import("./PresentationThumbnailCanvas"));
 
@@ -20,7 +21,7 @@ export default function PresentationThumbnail({ id }: { id: string }) {
     queryFn: () => fetchDocumentData(id),
     enabled: visible,
   });
-  const bytes = useMemo(() => data?.pptx ? decodePptx(data.pptx) : null, [data?.pptx]);
+  const bytes = useMemo(() => data ? decodePptx(data.pptx || blank.split(",")[1]) : null, [data]);
 
   useEffect(() => {
     const node = container.current;

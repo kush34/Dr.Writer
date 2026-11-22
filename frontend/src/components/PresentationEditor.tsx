@@ -83,6 +83,7 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
       setSavedTitle(titleSnapshot);
       setLocalTitle(current => current === rawTitle ? titleSnapshot : current);
       query.setQueryData(["document", id], (old: object | undefined) => old && ({ ...old, title: titleSnapshot, pptx, revision: data.revision }));
+      query.setQueryData(["document-thumbnail", id], (old: object | undefined) => old && ({ ...old, pptx, revision: data.revision }));
       query.invalidateQueries({ queryKey: ["documents"] });
       toast.success("Presentation saved");
     } catch (err) {
@@ -102,16 +103,13 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, saving]);
-  return <section className="presentation-editor flex h-full w-full min-w-0 flex-col">
+  return <section className={`presentation-editor ${docMode ? "presentation-editor--dock" : ""} flex h-full w-full min-w-0 flex-col`}>
     {blocker.state === "blocked" && <div role="alert" className="flex items-center gap-3 border p-2">
       Leave with unsaved changes?
       <button onClick={() => blocker.reset()}>Stay</button>
       <button disabled={saving} onClick={() => blocker.proceed()}>Discard and leave</button>
     </div>}
     <header className="flex items-center gap-3 pb-2">
-      <button type="button" aria-label="Back to documents" title="Back to documents" onClick={() => navigate("/home")} className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
-        <ArrowLeft size={18} />
-      </button>
       <input aria-label="Presentation title" maxLength={255} value={localTitle} onChange={event => setLocalTitle(event.target.value)} className="mr-auto min-w-0 flex-1 rounded bg-transparent px-2 text-lg font-bold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" />
       <label><input type="checkbox" checked={autosave} onChange={event => { attempted.current = undefined; setAutosave(event.target.checked); }} /> Autosave</label>
       <Button aria-label="Save presentation" title={saving ? "Saving…" : "Save presentation"} disabled={!editor || saving} onClick={() => save(false)}>
@@ -119,7 +117,10 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
       </Button>
       <Button aria-label="Download presentation" title="Download presentation" disabled={!editor} onClick={() => save(true)}>
         <Download />
-      </Button></header>
-    <PptxEditor className={`min-h-0 flex-1 ${docMode ? "pb-24" : ""}`} document={bytes} mode="edit" colorMode={theme} notesPane={{ defaultOpen: false, className: "presentation-notes" }} onReady={setEditor} />
+      </Button>
+      <button type="button" aria-label="Back to documents" title="Back to documents" onClick={() => navigate("/home")} className="ml-3 flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+        <ArrowLeft size={18} />
+      </button></header>
+    <PptxEditor className="min-h-0 flex-1" document={bytes} mode="edit" colorMode={theme} notesPane={{ defaultOpen: false, className: "presentation-notes" }} onReady={setEditor} />
   </section>;
 }
