@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createDocument, uploadDocument } from "@/service/document";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
 
 const Home = () => {
   const queryClient = useQueryClient();
@@ -124,11 +125,12 @@ const Home = () => {
 
   return (
     <Layout>
+      <div className="flex min-h-[calc(100svh-2.25rem)] flex-col">
       <Files />
-      <div className="flex justify-end mr-12">
+      <div className="mt-auto p-4">
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-primary">Add</Button>
+            <Button size="icon" aria-label="Add document" title="Add document"><Plus /></Button>
           </DialogTrigger>
 
           <DialogContent>
@@ -173,6 +175,7 @@ const Home = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      </div>
       </div>
     </Layout>
   );

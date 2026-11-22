@@ -81,7 +81,7 @@ export const createDocument = async (userId: string, title: string) => {
 
 export const getDocumentList = async (userId: string) => {
   const documents = await Document.find({ user_id: userId }).select(
-    "title content createdAt uploadStatus uploadError sourceFileName"
+    "title content createdAt editedAt uploadStatus uploadError sourceFileName"
   ).lean();
   const previewText = (content: unknown): string => {
     if (typeof content === "string") return content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
@@ -117,7 +117,7 @@ export const updateDocument = async (
 
   const updatedDocument = await Document.findByIdAndUpdate(
     fileId,
-    { content: newContent, title },
+    { content: newContent, title, editedAt: new Date() },
     { new: true }
   );
 
@@ -334,7 +334,7 @@ export const syncDocument = async (
   if (title !== document.title || newContent !== document.content) {
     await Document.findByIdAndUpdate(
       fileId,
-      { title, content: JSON.stringify(newContent) },
+      { title, content: JSON.stringify(newContent), editedAt: new Date() },
       { new: true }
     );
   }

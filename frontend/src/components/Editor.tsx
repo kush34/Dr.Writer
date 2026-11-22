@@ -49,7 +49,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
     mutationFn: updateDocumentApi,
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: ["documents"] });
-      queryClient.setQueryData(["documents"], (old: any) => old && ({ ...old, documents: old.documents.map((item: any) => item._id === variables.id ? { ...item, title: variables.title } : item) }));
+      queryClient.setQueryData(["documents"], (old: any) => old && ({ ...old, documents: old.documents.map((item: any) => item._id === variables.id ? { ...item, title: variables.title, editedAt: new Date().toISOString() } : item) }));
       return { toastId: toast.loading("Saving document…") };
     },
     onSuccess: (_result, _variables, context) => {
