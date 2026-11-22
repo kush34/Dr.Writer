@@ -11,9 +11,11 @@ import { readOutline, applyPresentationEdits } from "@/service/presentation";
 import apiClient from "@/service/axiosConfig";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, SaveAll } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/context/ThemeContext";
+import { Button } from "@/components/ui/button";
+import "./PresentationEditor.css";
 
 export default function PresentationEditor({ id, title, pptx, revision }: {
   id: string; title: string; pptx?: string; revision: number;
@@ -100,7 +102,7 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, saving]);
-  return <section className="flex h-full w-full min-w-0 flex-col">
+  return <section className="presentation-editor flex h-full w-full min-w-0 flex-col">
     {blocker.state === "blocked" && <div role="alert" className="flex items-center gap-3 border p-2">
       Leave with unsaved changes?
       <button onClick={() => blocker.reset()}>Stay</button>
@@ -112,10 +114,12 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
       </button>
       <input aria-label="Presentation title" maxLength={255} value={localTitle} onChange={event => setLocalTitle(event.target.value)} className="mr-auto min-w-0 flex-1 rounded bg-transparent px-2 text-lg font-bold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" />
       <label><input type="checkbox" checked={autosave} onChange={event => { attempted.current = undefined; setAutosave(event.target.checked); }} /> Autosave</label>
-      <button disabled={!editor || saving} onClick={() => save(false)}>{saving ? "Saving…" : "Save"}</button>
-      <button type="button" aria-label="Download presentation" title="Download presentation" disabled={!editor} onClick={() => save(true)} className="flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 hover:bg-accent disabled:opacity-50">
-        <Download size={16} /> <span className="hidden sm:inline">Download .pptx</span>
-      </button></header>
-    <PptxEditor className={`min-h-0 flex-1 ${docMode ? "pb-24" : ""}`} document={bytes} mode="edit" colorMode={theme} notesPane={{ defaultOpen: false }} onReady={setEditor} />
+      <Button aria-label="Save presentation" title={saving ? "Saving…" : "Save presentation"} disabled={!editor || saving} onClick={() => save(false)}>
+        <SaveAll />
+      </Button>
+      <Button aria-label="Download presentation" title="Download presentation" disabled={!editor} onClick={() => save(true)}>
+        <Download />
+      </Button></header>
+    <PptxEditor className={`min-h-0 flex-1 ${docMode ? "pb-24" : ""}`} document={bytes} mode="edit" colorMode={theme} notesPane={{ defaultOpen: false, className: "presentation-notes" }} onReady={setEditor} />
   </section>;
 }

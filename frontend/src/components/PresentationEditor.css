@@ -1,0 +1,5 @@
+.presentation-editor .presentation-notes[data-open="false"] {
+  align-self: flex-end;
+  width: min(220px, calc(100% - 24px));
+  margin: 0 18px 12px auto;
+}
