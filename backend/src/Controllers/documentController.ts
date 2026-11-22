@@ -127,8 +127,8 @@ const performDocumentActionHandler = async (req: Request, res: Response) => {
   try {
     const userId = requireAuthenticatedUser(req);
     const { documentId } = documentActionParamsSchema.parse(req.params);
-    const { command } = documentActionBodySchema.parse(req.body);
-    const result = await performDocumentAction(userId, documentId, command);
+    const { command, content, modelName } = documentActionBodySchema.parse(req.body);
+    const result = await performDocumentAction(userId, documentId, command, content, modelName);
     res.status(200).json(result);
   } catch (error) {
     handleControllerError(res, error);

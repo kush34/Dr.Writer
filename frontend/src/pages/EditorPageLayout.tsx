@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { GeminiChatBar } from "@/components/GeminiChatBar";
 import { useParams } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSharedEditor } from "@/context/EditorContext";
 import { useSidebarSide } from "@/config/sidebar-side";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import "./printer.css";
@@ -16,12 +17,33 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 const EditorPageLayout = ({ children }: { children: ReactNode }) => {
   const { id } = useParams();
+  const { editor } = useSharedEditor();
+  const [citation, setCitation] = useState("");
+  const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
   const isMobile = useIsMobile();
   const side = useSidebarSide();
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_DESKTOP_SPLIT);
   const [isDragging, setIsDragging] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
+  const [docMode, setDocMode] = useState(() => localStorage.getItem("drwriter.assistantLayout") === "dock");
+
+  useEffect(() => {
+    if (!editor) return;
+    const update = () => {
+      const { from, to, empty } = editor.state.selection;
+      const text = editor.state.doc.textBetween(from, to, "\n").trim();
+      if (empty || !text) { setSelection(null); return; }
+      const rect = editor.view.coordsAtPos(to);
+      setSelection({ text, x: Math.min(window.innerWidth - 90, Math.max(8, rect.left)), y: Math.max(8, rect.top - 40) });
+    };
+    editor.on("selectionUpdate", update);
+    const clear = () => setSelection(null);
+    editor.on("blur", clear);
+    return () => { editor.off("selectionUpdate", update); editor.off("blur", clear); };
+  }, [editor]);
+
+  const citeSelection = selection && <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setCitation(selection.text); setSelection(null); if (!docMode) setChatOpen(true); }} style={{ position: "fixed", left: selection.x, top: selection.y }} className="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">Cite text</button>;
 
   useEffect(() => {
     const savedWidth = window.localStorage.getItem(SPLIT_STORAGE_KEY);
@@ -81,14 +103,16 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
     return (
       <SidebarProvider defaultOpen className="relative h-screen">
         <div className="relative flex h-screen w-full overflow-hidden">
-          <GeminiChatBar documentId={id} mode="mobile" side={side} />
+          {!docMode && <GeminiChatBar documentId={id} mode="mobile" side={side} docMode={docMode} setDocMode={setDocMode} citation={citation} setCitation={setCitation} />}
           <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
-            <SidebarTrigger className={`absolute ${side === "right" ? "right-4" : "left-4"} top-4 z-20 md:hidden`} />
+            {!docMode && <SidebarTrigger className={`absolute ${side === "right" ? "right-4" : "left-4"} top-4 z-20 md:hidden`} />}
+            {docMode && <div className="absolute bottom-4 left-3 right-3 z-30"><GeminiChatBar documentId={id} mode="mobile" docMode={docMode} setDocMode={setDocMode} citation={citation} setCitation={setCitation} /></div>}
             <div className="flex h-full min-h-0 w-full min-w-0 justify-center px-3 pb-3 pt-16">
               {children}
             </div>
           </main>
         </div>
+        {citeSelection}
         <Toaster />
       </SidebarProvider>
     );
@@ -101,14 +125,14 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
     >
       <div
         id="editor-chat-panel"
-        hidden={!chatOpen}
-        className="relative h-full min-h-0 shrink-0"
-        style={{ width: `${sidebarWidth}%`, minWidth: `${MIN_PANEL_WIDTH}px` }}
+        hidden={!chatOpen && !docMode}
+        className={docMode ? "absolute bottom-4 left-1/2 z-30 w-[min(90%,720px)] -translate-x-1/2" : "relative h-full min-h-0 shrink-0"}
+        style={docMode ? undefined : { width: `${sidebarWidth}%`, minWidth: `${MIN_PANEL_WIDTH}px` }}
       >
-        <GeminiChatBar documentId={id} mode="desktop" />
+        <GeminiChatBar documentId={id} mode="desktop" docMode={docMode} setDocMode={setDocMode} citation={citation} setCitation={setCitation} />
       </div>
 
-      {chatOpen && <button
+      {chatOpen && !docMode && <button
         type="button"
         role="separator"
         aria-orientation="vertical"
@@ -126,7 +150,7 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
       </button>}
 
       <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
-        <button
+        {!docMode && <button
           type="button"
           aria-label={chatOpen ? "Collapse chat sidebar" : "Expand chat sidebar"}
           aria-expanded={chatOpen}
@@ -136,11 +160,12 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
           className={`absolute top-5 z-20 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${side === "right" ? "right-1" : "left-1"}`}
         >
           {side === "left" ? (chatOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />) : (chatOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />)}
-        </button>
+        </button>}
         <div className={`flex h-full min-h-0 w-full min-w-0 justify-center overflow-hidden px-4 py-4 md:px-6 ${side === "right" ? "pr-12 md:pr-12" : "pl-12 md:pl-12"}`}>
           {children}
         </div>
       </main>
+      {citeSelection}
       <Toaster />
     </div>
   );

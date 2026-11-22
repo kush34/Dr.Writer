@@ -43,6 +43,8 @@ export const registerDocumentImageSchema = z.object({
 
 export const documentActionBodySchema = z.object({
   command: z.string().trim().min(1),
+  content: z.object({ type: z.literal("doc"), content: z.array(z.unknown()) }).passthrough().optional(),
+  modelName: z.string().optional(),
 });
 
 export const userPromptSchema = z.object({

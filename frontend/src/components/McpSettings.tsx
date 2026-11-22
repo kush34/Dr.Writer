@@ -12,6 +12,10 @@ const example = '{\n  "url": "https://example.com/mcp",\n  "headers": {\n    "Au
 
 export function McpSettings({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [servers, setServers] = useState<string[]>([]);
+  const [details, setDetails] = useState<Record<string, { displayName?: string; icon?: string }>>({});
+  const [editingAppearance, setEditingAppearance] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [icon, setIcon] = useState("");
   const [name, setName] = useState("");
   const [config, setConfig] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,8 +28,8 @@ export function McpSettings({ open, onOpenChange }: { open: boolean; onOpenChang
     let active = true;
     setLoading(true);
     setError("");
-    apiClient.get<{ servers: string[] }>("/mcp")
-      .then(({ data }) => { if (active) setServers(data.servers); })
+    apiClient.get<{ servers: string[]; serverDetails: Record<string, { displayName?: string; icon?: string }> }>("/mcp")
+      .then(({ data }) => { if (active) { setServers(data.servers); setDetails(data.serverDetails || {}); } })
       .catch(() => { if (active) setError("Could not load MCP servers. Please try again."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -61,6 +65,18 @@ export function McpSettings({ open, onOpenChange }: { open: boolean; onOpenChang
     } finally { setBusy(false); }
   };
 
+  const saveAppearance = async () => {
+    if (!editingAppearance) return;
+    setBusy(true);
+    try {
+      await apiClient.patch(`/mcp/${encodeURIComponent(editingAppearance)}/appearance`, { displayName, ...(icon ? { icon } : {}) });
+      setDetails((current) => ({ ...current, [editingAppearance]: { displayName, icon } }));
+      setEditingAppearance(null);
+      toast.success("Server appearance updated");
+    } catch { setError("Could not update server appearance."); }
+    finally { setBusy(false); }
+  };
+
   const remove = async (serverName: string) => {
     setBusy(true);
     setError("");
@@ -90,8 +106,9 @@ export function McpSettings({ open, onOpenChange }: { open: boolean; onOpenChang
           {loading ? <div role="status" aria-label="Loading servers" className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div> : servers.length === 0 ? <p className="text-sm text-muted-foreground">No servers configured.</p> : (
             <ul className="space-y-2">
               {servers.map((server) => <li key={server} className="flex items-center justify-between gap-3 rounded-md border p-2">
-                <span className="min-w-0 break-all text-sm">{server}</span>
+                <span className="min-w-0 break-all text-sm">{details[server]?.displayName || server}</span>
                 <div className="flex shrink-0 gap-1">
+                  <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => { setEditingAppearance(server); setDisplayName(details[server]?.displayName || ""); setIcon(details[server]?.icon || ""); }}>Appearance</Button>
                   <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => { setName(server); setConfig(""); setNotice("Enter the complete replacement configuration, including any credentials."); }}>Replace</Button>
                   <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => remove(server)}>Remove</Button>
                 </div>
@@ -99,6 +116,12 @@ export function McpSettings({ open, onOpenChange }: { open: boolean; onOpenChang
             </ul>
           )}
         </section>
+        {editingAppearance && <section className="space-y-3 border-t pt-4" aria-label="Server appearance">
+          <h3 className="text-sm font-semibold">Appearance for {editingAppearance}</h3>
+          <div className="space-y-1"><Label htmlFor="mcp-display-name">Display name (optional)</Label><Input id="mcp-display-name" maxLength={80} value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={editingAppearance} /></div>
+          <div className="space-y-1"><Label htmlFor="mcp-icon">Product icon</Label><select id="mcp-icon" value={icon} onChange={(event) => setIcon(event.target.value)} className="w-full rounded-md border border-input bg-background p-2 text-sm"><option value="">Automatic / generic</option><option value="github">GitHub</option><option value="googledrive">Google Drive</option><option value="linear">Linear</option><option value="notion">Notion</option></select></div>
+          <div className="flex gap-2"><Button type="button" disabled={busy} onClick={saveAppearance}>Save appearance</Button><Button type="button" variant="ghost" onClick={() => setEditingAppearance(null)}>Cancel</Button></div>
+        </section>}
         <form onSubmit={save} className="space-y-3 border-t pt-4">
           <h3 className="text-sm font-semibold">Add or replace a server</h3>
           <div className="space-y-1"><Label htmlFor="mcp-name">Server name</Label><Input id="mcp-name" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="My server" autoComplete="off" /></div>

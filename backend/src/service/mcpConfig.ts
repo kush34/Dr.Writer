@@ -7,6 +7,8 @@ export const mcpConfigSchema = z.object({
   mcpServers: z.record(z.string().min(1).max(80), z.object({
     url: z.string().url().max(2048).refine((value) => { try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password; } catch { return false; } }, "Use an HTTPS URL without embedded credentials"),
     headers: z.record(z.string().max(4096)).optional(),
+    displayName: z.string().trim().max(80).optional(),
+    icon: z.enum(["github", "googledrive", "linear", "notion"]).optional(),
   }).strict()).refine((servers) => Object.keys(servers).length <= 20, "At most 20 servers are allowed"),
 }).strict();
 
