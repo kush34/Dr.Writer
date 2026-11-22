@@ -1,5 +1,6 @@
-import React, { useContext, useRef, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import Layout from "./Layout";
+import { useSearchParams } from "react-router-dom";
 import Files from "../components/Files";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,10 +22,17 @@ import { Plus } from "lucide-react";
 
 const Home = () => {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [newTitle, setNewTitle] = useState<string>("New Document");
   const [dialogOpen, setDialogOpen] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (searchParams.get("create") === "1") {
+      setDialogOpen(true);
+      setSearchParams((current) => { const next = new URLSearchParams(current); next.delete("create"); return next; }, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const addPending = async (id: string, title: string) => {
     await queryClient.cancelQueries({ queryKey: ["documents"] });

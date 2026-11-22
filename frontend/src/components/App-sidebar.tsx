@@ -22,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 import { useUser } from "@/context/UserContext";
@@ -30,6 +31,7 @@ import { useTheme } from "next-themes";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuPortal, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
 import { getUserInfo } from "@/service/document";
+import { openCommandSearch } from "./CommandSearch";
 import { MAX_TOKENS } from "@/config/llm";
 
 
@@ -64,6 +66,7 @@ const items = [
 
 export function AppSidebar({ side = "left" }: { side?: "left" | "right" }) {
   const { theme } = useTheme();
+  const { setOpenMobile } = useSidebar();
   const { user, loading } = useUser();
   const { data, isLoading, error } = useQuery({
     queryKey: ["user"],
@@ -98,7 +101,7 @@ export function AppSidebar({ side = "left" }: { side?: "left" | "right" }) {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  {item.title === "Settings" ? <SidebarMenuButton onClick={() => navigate("/settings")}><item.icon /><span>Settings</span></SidebarMenuButton> : item.title === "Home" ? <SidebarMenuButton asChild>
+                  {item.title === "Search" ? <SidebarMenuButton onClick={() => { setOpenMobile(false); openCommandSearch(); }}><item.icon /><span>Search</span><span className="ml-auto text-xs text-muted-foreground">Ctrl K</span></SidebarMenuButton> : item.title === "Settings" ? <SidebarMenuButton onClick={() => navigate("/settings")}><item.icon /><span>Settings</span></SidebarMenuButton> : item.title === "Home" ? <SidebarMenuButton asChild>
                     <Link to={item.url}><item.icon /><span>{item.title}</span></Link>
                   </SidebarMenuButton> : <SidebarMenuButton asChild>
                     <a href={item.url}>

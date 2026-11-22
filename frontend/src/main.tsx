@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Outlet } from "react-router";
 import { ThemeProvider } from '@/context/ThemeContext';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UserContextProvider } from './context/UserContext';
+import { CommandSearch } from './components/CommandSearch';
 
 // Lazy imports
 const App = lazy(() => import('./App'));
@@ -26,7 +27,7 @@ const queryClient = new QueryClient({
 
 function ThemedRoutes() {
   return (
-    <Outlet />
+    <><CommandSearch /><Outlet /></>
   );
 }
 

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import Layout from "@/pages/Layout";
@@ -10,8 +11,15 @@ import { McpSettings } from "@/components/McpSettings";
 
 export default function Settings() {
   const side = useSidebarSide();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [model, setModel] = useState(getDefaultModel);
   const [mcpOpen, setMcpOpen] = useState(false);
+  useEffect(() => {
+    const section = searchParams.get("section");
+    if (section === "mcp") setMcpOpen(true);
+    if (section === "model") document.getElementById("default-model")?.focus();
+    if (section) setSearchParams((current) => { const next = new URLSearchParams(current); next.delete("section"); return next; }, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   return <Layout>
       <div className="mx-auto w-full max-w-2xl space-y-8 px-5 pb-12 pt-6 sm:px-8">

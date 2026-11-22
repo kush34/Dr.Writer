@@ -10,6 +10,7 @@ import {
   getDocumentChats,
   getDocumentData,
   getDocumentList,
+  searchDocuments,
   getTestDocument,
   performDocumentAction,
   registerDocumentImage,
@@ -78,6 +79,15 @@ const getDocumentListHandler = async (req: Request, res: Response) => {
   } catch (error) {
     handleControllerError(res, error);
   }
+};
+
+const searchDocumentsHandler = async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuthenticatedUser(req);
+    const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (query.length < 2 || query.length > 200) throw new AppError(400, "Search must be between 2 and 200 characters");
+    res.json({ documents: await searchDocuments(userId, query) });
+  } catch (error) { handleControllerError(res, error); }
 };
 
 const getDocumentDataHandler = async (req: Request, res: Response) => {
@@ -198,6 +208,7 @@ export const registerDocumentRoutes = (router: Router) => {
   router.get("/getDoc", getDocHandler);
   router.post("/createDocument", firebaseTokenVerify, createDocumentHandler);
   router.get("/documentList", firebaseTokenVerify, getDocumentListHandler);
+  router.get("/search", firebaseTokenVerify, searchDocumentsHandler);
   router.post("/documentData", firebaseTokenVerify, getDocumentDataHandler);
   router.post("/documentUpdate", firebaseTokenVerify, updateDocumentHandler);
   router.post("/adduser", firebaseTokenVerify, addUserHandler);
