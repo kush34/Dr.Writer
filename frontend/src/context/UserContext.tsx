@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { auth } from "@/firebaseAuth/firebaseConfig";
 import { useNavigate } from 'react-router-dom';
-import Loader from '@/components/loaders/Loader';
+import { PageSkeleton } from '@/components/PageSkeleton';
 import * as firebaseAuth from "@/firebaseAuth/firebaseConfig"
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -43,11 +43,7 @@ const UserContextProvider = ({ children }: { children: ReactNode }) => {
 
         return () => unsubscribe(); // Cleanup on unmount
     }, []);
-    if (loading) return (
-        <div>
-            <Loader />
-        </div>
-    )
+    if (loading) return <PageSkeleton />
     return (
         <UserContext.Provider value={{ user, loading, setLoading }}>
             {children}

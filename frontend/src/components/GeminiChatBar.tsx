@@ -13,6 +13,7 @@ import apiClient from "@/service/axiosConfig";
 import { getAuth } from "firebase/auth";
 import { toast } from "sonner";
 import { availableModels, getDefaultModel } from "@/config/models";
+import { ChatMessagesSkeleton } from "@/components/PageSkeleton";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -43,6 +44,7 @@ type GeminiChatBarProps = {
 
 function GeminiChatPanel({
   data,
+  chatLoading,
   currentModel,
   actionMode,
   setActionMode,
@@ -56,6 +58,7 @@ function GeminiChatPanel({
   modelChanges,
 }: {
   data: DocumentChatResponse | undefined;
+  chatLoading: boolean;
   currentModel: string;
   actionMode: boolean;
   setActionMode: (value: boolean) => void;
@@ -101,7 +104,7 @@ function GeminiChatPanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="flex flex-col gap-2">
-          {data?.documentChat?.length === 0 ? (
+          {chatLoading ? <ChatMessagesSkeleton /> : data?.documentChat?.length === 0 ? (
             <div className="px-4 text-muted-foreground">Enter prompt for {currentModel} response</div>
           ) : (
             data?.documentChat?.map((item, index) => (
@@ -195,7 +198,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left" }: Ge
   const [modelChanges, setModelChanges] = useState<{ index: number; from: string; to: string }[]>([]);
 
   const queryClient = useQueryClient();
-  const { data } = useQuery<DocumentChatResponse>({
+  const { data, isLoading: chatLoading } = useQuery<DocumentChatResponse>({
     queryKey: ["documentChat", documentId],
     enabled: !!user && !!documentId,
     queryFn: () => getChatsForDocument(documentId)
@@ -324,6 +327,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left" }: Ge
   const panel = (
     <GeminiChatPanel
       data={data}
+      chatLoading={chatLoading}
       currentModel={currentModel}
       currentModelSetter={(model) => { if (model !== currentModel) { setModelChanges((changes) => [...changes, { index: data?.documentChat?.length ?? 0, from: currentModel, to: model }]); setCurrentModel(model); } }}
       modelChanges={modelChanges}

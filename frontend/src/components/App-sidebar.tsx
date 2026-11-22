@@ -115,6 +115,9 @@ export function AppSidebar({ side = "left" }: { side?: "left" | "right" }) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarGroupContent className="px-2 pb-2">
+        <ModeToggle />
+      </SidebarGroupContent>
       <SidebarGroupContent className="p-2 space-y-1">
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>Tokens</span>
@@ -133,9 +136,6 @@ export function AppSidebar({ side = "left" }: { side?: "left" | "right" }) {
 
       <SidebarFooter className={`!border-none overflow-visible`}>
         <SidebarContent className="!p-2 !bg-transparent">
-          <SidebarGroupContent className="p-0">
-            <ModeToggle />
-          </SidebarGroupContent>
           <SidebarGroupContent className="p-0 flex items-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

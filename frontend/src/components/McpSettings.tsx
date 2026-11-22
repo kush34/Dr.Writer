@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import apiClient from "@/service/axiosConfig";
 import axios from "axios";
@@ -86,7 +87,7 @@ export function McpSettings({ open, onOpenChange }: { open: boolean; onOpenChang
         </DialogHeader>
         <section aria-label="Saved MCP servers" className="space-y-2">
           <h3 className="text-sm font-semibold">Saved servers</h3>
-          {loading ? <p className="text-sm text-muted-foreground">Loading servers…</p> : servers.length === 0 ? <p className="text-sm text-muted-foreground">No servers configured.</p> : (
+          {loading ? <div role="status" aria-label="Loading servers" className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div> : servers.length === 0 ? <p className="text-sm text-muted-foreground">No servers configured.</p> : (
             <ul className="space-y-2">
               {servers.map((server) => <li key={server} className="flex items-center justify-between gap-3 rounded-md border p-2">
                 <span className="min-w-0 break-all text-sm">{server}</span>

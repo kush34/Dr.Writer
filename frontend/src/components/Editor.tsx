@@ -10,7 +10,7 @@ import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { DocumentDTO } from "@/types";
-import { useState } from "react";
+import { EditorSkeleton } from "@/components/PageSkeleton";
 
 const normalizeContent = (content: any): JSONContent => {
   if (typeof content === "object" && content?.type === "doc") return content;
@@ -72,7 +72,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
     updateMutation.mutate({ id, title: title, content: editor.getJSON() });
   };
 
-  if (userLoading || isLoading) return <div className="h-screen flex items-center justify-center text-lg">Syncing document…</div>;
+  if (userLoading || isLoading) return <EditorSkeleton />;
   if (!user) return <p>User not logged in</p>;
   if (error) return <p>Failed to load document</p>;
   if (!data) return <p>No document data</p>;

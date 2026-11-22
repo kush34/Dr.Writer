@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UserContextProvider } from './context/UserContext';
 import { CommandSearch } from './components/CommandSearch';
+import { PageSkeleton } from './components/PageSkeleton';
 
 // Lazy imports
 const App = lazy(() => import('./App'));
@@ -39,7 +40,7 @@ if (root) {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <UserContextProvider>
-            <Suspense fallback={<div>Loading...</div>}>
+            <Suspense fallback={<PageSkeleton />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<App />} />
