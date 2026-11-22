@@ -165,7 +165,9 @@ export const addUserToDocument = async (
 export const performDocumentAction = async (
   userId: string,
   documentId: string,
-  command: string
+  command: string,
+  currentContent?: { type: "doc"; content: unknown[] },
+  modelName?: string
 ) => {
   const document = await findDocumentOrThrow(documentId);
 
@@ -173,8 +175,9 @@ export const performDocumentAction = async (
     throw new AppError(403, "Document not found");
   }
 
-  const blockCount = Array.isArray(document.content?.content)
-    ? document.content.content.length
+  const content = currentContent ?? document.content;
+  const blockCount = Array.isArray(content?.content)
+    ? content.content.length
     : 0;
 
   const rawResponse = await openRouterComplete(
@@ -186,6 +189,7 @@ The document is TipTap JSON. Edit operations use top-level block indexes, not ch
 
 Allowed response shape:
 {
+  "question": "A concise clarification question, only if needed",
   "operations": [
     { "type": "insert", "at": number, "text": string },
     { "type": "replace", "from": number, "to": number, "text": string },
@@ -194,6 +198,7 @@ Allowed response shape:
 }
 
 Rules:
+- If the command needs clarification, return a question and no operations.
 - "at", "from", and "to" refer to indexes in the top-level "content" array.
 - Current top-level block count is ${blockCount}.
 - Keep indexes within the existing block range.
@@ -201,19 +206,23 @@ Rules:
 - Use "replace" or "delete" only for whole top-level blocks.
 
 Document:
-${JSON.stringify(document.content)}
+${JSON.stringify(content)}
 
 Command:
 ${command}`,
-    "openai/gpt-4o-mini" // or pass model as param
+    modelName || "openai/gpt-4o-mini"
   );
 
-  let llmResponse: { operations?: unknown[] };
+  let llmResponse: { operations?: unknown[]; question?: string };
   try {
     llmResponse = extractJsonPayload(rawResponse);
   } catch (error) {
     console.error("Invalid OpenRouter edit response:", rawResponse);
     throw error;
+  }
+
+  if (typeof llmResponse.question === "string" && llmResponse.question.trim() && !llmResponse.operations?.length) {
+    return { question: llmResponse.question.trim() };
   }
 
   const safeOperations = sanitizeOperations(
@@ -224,7 +233,7 @@ ${command}`,
     throw new AppError(400, "LLM returned no valid operations");
   }
 
-  const updatedContent = applyEdits(document.content, safeOperations);
+  const updatedContent = applyEdits(content as Parameters<typeof applyEdits>[0], safeOperations);
 
   return {
     updatedContent,
@@ -285,7 +294,7 @@ export const streamUserPrompt = async (
         toolMode = true;
         const result = await openRouterWithTools(userPrompt, modelName, connection.tools, (server, tool) => {
           toolAttempts++;
-          res.write(`data: ${JSON.stringify({ type: "tool", server, tool })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: "tool", server, tool, displayName: config.mcpServers[server]?.displayName, icon: config.mcpServers[server]?.icon })}\n\n`);
         }, (tokens) => {
           modelTokens += tokens;
         }, async (tokens) => {

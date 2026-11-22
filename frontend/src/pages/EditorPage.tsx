@@ -1,12 +1,13 @@
 
 import React, { useState } from "react";
+import type { Editor as TiptapEditor } from "@tiptap/react";
 import { UserContextProvider } from "@/context/UserContext";
 import EditorPageLayout from "./EditorPageLayout";
 import Editor from "@/components/Editor";
 import { SharedEditorContext } from "@/context/EditorContext";
 
 const EditorPage = () => {
-  const [editorInstance, setEditorInstance] = useState(null);
+  const [editorInstance, setEditorInstance] = useState<TiptapEditor | null>(null);
 
   return (
     <SharedEditorContext.Provider value={{ editor: editorInstance, setEditor: setEditorInstance }}>

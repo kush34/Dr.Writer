@@ -15,6 +15,7 @@ export default function Settings() {
   const autosave = useAutosave();
   const [searchParams, setSearchParams] = useSearchParams();
   const [model, setModel] = useState(getDefaultModel);
+  const [assistantLayout, setAssistantLayout] = useState(() => localStorage.getItem("drwriter.assistantLayout") === "dock" ? "dock" : "sidebar");
   const [mcpOpen, setMcpOpen] = useState(false);
   useEffect(() => {
     const section = searchParams.get("section");
@@ -37,6 +38,11 @@ export default function Settings() {
           <Label htmlFor="document-autosave">Document autosave</Label>
           <p className="text-sm text-muted-foreground">Automatically save document changes after you stop editing. This preference is stored in this browser.</p>
           <select id="document-autosave" value={autosave ? "on" : "off"} onChange={(event) => setAutosave(event.target.value === "on")} className="w-full rounded-md border border-input bg-background p-2 text-sm"><option value="off">Off</option><option value="on">On</option></select>
+        </section>
+        <section className="space-y-2 border-t pt-4">
+          <Label htmlFor="assistant-layout">Default assistant layout</Label>
+          <p className="text-sm text-muted-foreground">Choose how the assistant opens in the editor on this browser.</p>
+          <select id="assistant-layout" value={assistantLayout} onChange={(event) => { setAssistantLayout(event.target.value); localStorage.setItem("drwriter.assistantLayout", event.target.value); }} className="w-full rounded-md border border-input bg-background p-2 text-sm"><option value="sidebar">Side panel</option><option value="dock">Bottom dock</option></select>
         </section>
         <section className="space-y-2 border-t pt-4">
           <Label htmlFor="sidebar-side">Sidebar position</Label>
