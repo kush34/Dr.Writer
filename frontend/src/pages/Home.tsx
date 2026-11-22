@@ -25,6 +25,7 @@ const Home = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [newTitle, setNewTitle] = useState<string>("New Document");
+  const [kind, setKind] = useState<"document" | "presentation">("document");
   const [dialogOpen, setDialogOpen] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
@@ -43,7 +44,7 @@ const Home = () => {
   // CREATE DOC
   const createMutation = useMutation({
     mutationFn: createDocument,
-    onMutate: async (title) => {
+    onMutate: async ({ title }) => {
       const id = `pending-${crypto.randomUUID()}`;
       await addPending(id, title);
       setDialogOpen(false);
@@ -81,7 +82,7 @@ const Home = () => {
 
   const handleAdd = () => {
     if (!newTitle.trim()) { toast.error("Enter a document title"); return; }
-    createMutation.mutate(newTitle.trim());
+    createMutation.mutate({ title: newTitle.trim(), kind });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,8 +150,21 @@ const Home = () => {
 
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Title</Label>
+                <Label htmlFor="document-kind" className="text-right">File type</Label>
+                <select
+                  id="document-kind"
+                  value={kind}
+                  onChange={e => setKind(e.target.value as typeof kind)}
+                  className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="document">Document</option>
+                  <option value="presentation">PowerPoint presentation</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="document-title" className="text-right">Title</Label>
                 <Input
+                  id="document-title"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   className="col-span-3"
@@ -167,7 +181,7 @@ const Home = () => {
                 type="file"
                 hidden
                 ref={hiddenFileInput}
-                accept=".doc,.docx"
+                accept=".doc,.docx,.pptx"
                 onChange={handleFileUpload}
               />
 

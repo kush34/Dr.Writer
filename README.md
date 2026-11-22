@@ -125,3 +125,7 @@ npm start
 cd ../frontend
 npm start
 ```
+
+## Credits
+
+The AI dock and chat use components from [Rare UI](https://www.rareui.com/). Web search in chat uses the hosted [Exa MCP server](https://exa.ai/mcp).

@@ -36,6 +36,7 @@ var corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.urlencoded({extended:true}));
 app.use(globalLimiter);
+app.use("/api/document/:documentId/presentation", express.json({ limit: "9mb" }));
 app.use(express.json());
 app.use('/api',userRouter);
 app.use('/api/document',documentRouter);

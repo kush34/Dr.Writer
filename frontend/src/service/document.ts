@@ -7,8 +7,8 @@ export const fetchDocuments = async () => {
   return res.data;
 };
 
-export const createDocument = async (title: string) => {
-  const res = await apiClient.post("/document/createDocument", { title });
+export const createDocument = async ({ title, kind }: { title: string; kind: "document" | "presentation" }) => {
+  const res = await apiClient.post("/document/createDocument", { title, kind });
   return res.data;
 };
 
@@ -26,10 +26,19 @@ export const uploadDocument = async (
   const token = await user.getIdToken();
   const baseUrl = import.meta.env.VITE_Backend_URL;
 
+  const file = formData.get("file");
+  const isPresentation = file instanceof File && /\.pptx$/i.test(file.name);
+  if (isPresentation) {
+    if (file.size > 6 * 1024 * 1024) throw new Error("Presentation exceeds the 6 MiB limit.");
+    const { createServerAutomationHost } = await import("@pptx-editor.dev/core/automation");
+    const opened = createServerAutomationHost(new Uint8Array(await file.arrayBuffer()));
+    if (!opened.ok) throw new Error("The selected presentation could not be opened.");
+    opened.host.dispose();
+  }
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    xhr.open("POST", `${baseUrl}/document/fileUpload`);
+    xhr.open("POST", `${baseUrl}/document/${isPresentation ? "presentationUpload" : "fileUpload"}`);
     xhr.responseType = "json";
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 

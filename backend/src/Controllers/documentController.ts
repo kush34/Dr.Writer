@@ -1,4 +1,5 @@
 import { Request, Response, Router } from "express";
+import multer from "multer";
 import rateLimit from "express-rate-limit";
 import firebaseTokenVerify from "../Middlewares/firebaseTokenVerify";
 import upload from "../service/multer";
@@ -16,12 +17,15 @@ import {
   registerDocumentImage,
   streamUserPrompt,
   syncDocument,
+  savePresentation,
+  saveActionHistory,
   updateDocument,
 } from "../Services/documentService";
 import { AppError } from "../utils/appError";
 import { handleControllerError } from "../utils/controllerErrorHandler";
 import {
   addUserSchema,
+  actionHistorySchema,
   createDocumentImageSignatureSchema,
   createDocumentSchema,
   documentActionBodySchema,
@@ -30,6 +34,7 @@ import {
   getChatsParamsSchema,
   registerDocumentImageSchema,
   syncDocumentSchema,
+  savePresentationSchema,
   updateDocumentSchema,
   uploadDocumentImageParamsSchema,
   userPromptSchema,
@@ -63,8 +68,8 @@ const getDocHandler = async (_req: Request, res: Response) => {
 const createDocumentHandler = async (req: Request, res: Response) => {
   try {
     const userId = requireAuthenticatedUser(req);
-    const { title } = createDocumentSchema.parse(req.body);
-    const document = await createDocument(userId, title);
+    const { title, kind } = createDocumentSchema.parse(req.body);
+    const document = await createDocument(userId, title, kind);
     res.status(200).send({ message: "new document created", document });
   } catch (error) {
     handleControllerError(res, error);
@@ -127,8 +132,8 @@ const performDocumentActionHandler = async (req: Request, res: Response) => {
   try {
     const userId = requireAuthenticatedUser(req);
     const { documentId } = documentActionParamsSchema.parse(req.params);
-    const { command, content, modelName } = documentActionBodySchema.parse(req.body);
-    const result = await performDocumentAction(userId, documentId, command, content, modelName);
+    const { command, content, modelName, outline } = documentActionBodySchema.parse(req.body);
+    const result = await performDocumentAction(userId, documentId, command, content, modelName, outline);
     res.status(200).json(result);
   } catch (error) {
     handleControllerError(res, error);
@@ -206,6 +211,29 @@ const registerDocumentImageHandler = async (req: Request, res: Response) => {
 
 export const registerDocumentRoutes = (router: Router) => {
   router.get("/getDoc", getDocHandler);
+  const presentationUpload = multer({ limits: { fileSize: 6 * 1024 * 1024, files: 1, fields: 0 } }).single("file");
+  router.post("/presentationUpload", firebaseTokenVerify, (req, res) => {
+    presentationUpload(req, res, async error => {
+      try {
+        if (error) throw new AppError(error.code === "LIMIT_FILE_SIZE" ? 413 : 400, "Upload one .pptx file up to 6 MiB");
+        const file = req.file;
+        if (!file || !/\.pptx$/i.test(file.originalname) || file.size < 4 || file.buffer.readUInt32LE(0) !== 0x04034b50) {
+          throw new AppError(400, "Expected a PowerPoint .pptx file");
+        }
+        const { title } = createDocumentSchema.parse({ title: file.originalname.slice(0, -5) || "Presentation" });
+        const document = await createDocument(requireAuthenticatedUser(req), title, "presentation", file.buffer.toString("base64"));
+        res.status(201).json({ document: { _id: document._id, title, kind: document.kind } });
+      } catch (error) { handleControllerError(res, error); }
+    });
+  });
+  router.post("/:documentId/presentation", firebaseTokenVerify, async (req, res) => {
+    try {
+      const { pptx, revision, title } = savePresentationSchema.parse(req.body);
+      const { documentId } = documentActionParamsSchema.parse(req.params);
+      const nextRevision = await savePresentation(requireAuthenticatedUser(req), documentId, revision, pptx, title);
+      res.json({ revision: nextRevision });
+    } catch (error) { handleControllerError(res, error); }
+  });
   router.post("/createDocument", firebaseTokenVerify, createDocumentHandler);
   router.get("/documentList", firebaseTokenVerify, getDocumentListHandler);
   router.get("/search", firebaseTokenVerify, searchDocumentsHandler);
@@ -217,6 +245,14 @@ export const registerDocumentRoutes = (router: Router) => {
     firebaseTokenVerify,
     performDocumentActionHandler
   );
+  router.post("/actions/:documentId/history", firebaseTokenVerify, async (req, res) => {
+    try {
+      const { documentId } = documentActionParamsSchema.parse(req.params);
+      const { prompt, response } = actionHistorySchema.parse(req.body);
+      const chat = await saveActionHistory(requireAuthenticatedUser(req), documentId, prompt, response);
+      res.status(201).json({ chat });
+    } catch (error) { handleControllerError(res, error); }
+  });
   router.post(
     "/userprompt",
     geminiLimiter,

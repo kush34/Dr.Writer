@@ -1,3 +1,4 @@
+import { presentationPlan } from "../validation/documentSchemas";
 import { Response } from "express";
 import { documentText, searchExcerpt } from "../utils/documentSearch";
 import cloudinary from "../Config/cloudinary";
@@ -73,16 +74,16 @@ export const getTestDocument = async () => {
   return document;
 };
 
-export const createDocument = async (userId: string, title: string) => {
+export const createDocument = async (userId: string, title: string, kind: "document" | "presentation" = "document", pptx?: string) => {
   return Document.create({
-    title,
+    title, kind, pptx,
     user_id: userId,
   });
 };
 
 export const getDocumentList = async (userId: string) => {
   const documents = await Document.find({ user_id: userId }).select(
-    "title content createdAt editedAt uploadStatus uploadError sourceFileName"
+    "kind title content createdAt editedAt uploadStatus uploadError sourceFileName"
   ).lean();
   const previewText = (content: unknown): string => {
     if (typeof content === "string") return content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
@@ -127,7 +128,8 @@ export const updateDocument = async (
   title: string,
   newContent: unknown
 ) => {
-  await getDocumentData(userId, fileId);
+  const document = await getDocumentData(userId, fileId);
+  if (document.kind === "presentation") throw new AppError(400, "Use presentation save");
 
   const updatedDocument = await Document.findByIdAndUpdate(
     fileId,
@@ -140,6 +142,15 @@ export const updateDocument = async (
   }
 
   return updatedDocument;
+};
+
+export const savePresentation = async (userId: string, id: string, revision: number, pptx: string, title?: string) => {
+  const document = await getDocumentData(userId, id);
+  if (document.kind !== "presentation") throw new AppError(400, "Expected a presentation");
+  const saved = await Document.updateOne({ _id: id, revision, $or: [{ user_id: userId }, { users: userId }] },
+    { $set: { pptx, ...(title ? { title } : {}), editedAt: new Date() }, $inc: { revision: 1 } });
+  if (!saved.modifiedCount) throw new AppError(409, "A newer presentation was saved. Download your edits before reloading.");
+  return revision + 1;
 };
 
 export const addUserToDocument = async (
@@ -167,12 +178,33 @@ export const performDocumentAction = async (
   documentId: string,
   command: string,
   currentContent?: { type: "doc"; content: unknown[] },
-  modelName?: string
+  modelName?: string,
+  outline?: (string | null)[][]
 ) => {
   const document = await findDocumentOrThrow(documentId);
 
   if (!isDocumentOwner(userId, document.user_id)) {
     throw new AppError(403, "Document not found");
+  }
+
+  if (document.kind === "presentation") {
+    if (!outline) throw new AppError(400, "Open the presentation before requesting edits");
+    const raw = await openRouterComplete(
+      `Edit a PowerPoint presentation. Return JSON {"operations":[...]}.
+Allowed operations:
+- {"type":"append","title":"...","body":"..."} adds a new slide at the end.
+- {"type":"addText","slide":N,"text":"..."} adds a text box to an existing slide N.
+- {"type":"replace","slide":N,"shape":M,"text":"..."} rewrites existing shape M on existing slide N.
+The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for every new slide.
+The outline lists each slide and its shapes in zero-based order. Null means non-text. Keep unrelated content.
+Outline: ${JSON.stringify(outline)}
+Request: ${command}`, modelName || "openai/gpt-4o-mini");
+    const parsed = presentationPlan.safeParse(extractJsonPayload(raw)?.operations);
+    if (!parsed.success) throw new AppError(502, "Invalid presentation edits from model");
+    const invalid = parsed.data.some(op => op.type !== "append" &&
+      (op.slide >= outline.length || (op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))));
+    if (invalid) throw new AppError(502, "The model returned edits for slides that do not exist. Please try again.");
+    return { operations: parsed.data };
   }
 
   const content = currentContent ?? document.content;
@@ -273,7 +305,8 @@ export const streamUserPrompt = async (
     }
     reserved = true;
     reservedTokens = MAX_TOKENS_PER_REQUEST;
-    const config = await getMcpConfig(userId);
+    const userConfig = await getMcpConfig(userId);
+    const config = { mcpServers: { ...userConfig.mcpServers, drwriter_exa: { url: "https://mcp.exa.ai/mcp", displayName: "Exa web search" } } };
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("X-Accel-Buffering", "no");
@@ -292,9 +325,10 @@ export const streamUserPrompt = async (
       }
       if (connection.tools.length) {
         toolMode = true;
-        const result = await openRouterWithTools(userPrompt, modelName, connection.tools, (server, tool) => {
-          toolAttempts++;
-          res.write(`data: ${JSON.stringify({ type: "tool", server, tool, displayName: config.mcpServers[server]?.displayName, icon: config.mcpServers[server]?.icon })}\n\n`);
+        const result = await openRouterWithTools(userPrompt, modelName, connection.tools, (server, tool, phase) => {
+          if (phase === "start") toolAttempts++;
+          const settings = config.mcpServers[server as keyof typeof config.mcpServers];
+          res.write(`data: ${JSON.stringify({ type: "tool", server, tool, phase, displayName: settings?.displayName, icon: "icon" in (settings || {}) ? (settings as { icon?: string }).icon : undefined })}\n\n`);
         }, (tokens) => {
           modelTokens += tokens;
         }, async (tokens) => {
@@ -307,8 +341,10 @@ export const streamUserPrompt = async (
           );
           if (!user) throw new AppError(402, "Insufficient token balance for the next model request.");
           reservedTokens += additional;
-        });
-        res.write(`data: ${JSON.stringify({ chunk: result.text })}\n\n`);
+        }, (chunk) => res.write(`data: ${JSON.stringify({ chunk })}\n\n`),
+        () => res.write(`data: ${JSON.stringify({ type: "reset" })}\n\n`));
+        // Providers that return JSON despite stream=true have not emitted chunks.
+        if (!result.streamed) res.write(`data: ${JSON.stringify({ chunk: result.text })}\n\n`);
         await finish(result.text, result.count);
         return;
       }
@@ -354,6 +390,7 @@ export const syncDocument = async (
     throw new AppError(403, "You are not authorized to access this document");
   }
 
+  if (document.kind === "presentation") throw new AppError(400, "Use presentation save");
   if (title !== document.title || newContent !== document.content) {
     await Document.findByIdAndUpdate(
       fileId,
@@ -365,7 +402,13 @@ export const syncDocument = async (
 
 export const getDocumentChats = async (userId: string, documentId: string) => {
   await getDocumentData(userId, documentId);
-  return Chat.find({ documentId });
+  return Chat.find({ documentId }).sort({ createdAt: 1, _id: 1 });
+};
+
+export const saveActionHistory = async (userId: string, documentId: string, prompt: string, response: string) => {
+  const document = await findDocumentOrThrow(documentId);
+  if (!isDocumentOwner(userId, document.user_id)) throw new AppError(403, "Document not found");
+  return Chat.create({ documentId, prompt, response });
 };
 
 const assertCloudinaryConfigured = () => {

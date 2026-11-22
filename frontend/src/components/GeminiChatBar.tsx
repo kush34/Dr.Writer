@@ -4,12 +4,17 @@ import {
   SidebarMenu, SidebarMenuItem
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
+import { WebSearch } from "@/components/ui/web-search";
+import { StreamingResponse } from "@/components/ui/streaming-response";
+import { AiStatus } from "@/components/ui/ai-status";
+import { PromptBox } from "@/components/ui/prompt-box";
 import { ArrowDown, Bot, Check, Copy, MessageSquare, PanelBottom, SendHorizontal } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getChatsForDocument } from "@/service/document";
 import { useSharedEditor } from "@/context/EditorContext";
 import apiClient from "@/service/axiosConfig";
+import { isAxiosError } from "axios";
 import { getAuth } from "firebase/auth";
 import { toast } from "sonner";
 import { availableModels, getDefaultModel } from "@/config/models";
@@ -28,15 +33,16 @@ function ModelLogo({ model }: { model: string }) {
   return logo ? <img src={`/model-logos/${logo}.svg`} alt="" className="size-4 shrink-0 dark:rounded-sm dark:bg-white dark:p-0.5" /> : <Bot aria-hidden="true" className="size-4 shrink-0" />;
 }
 
-type ToolActivity = { server: string; tool: string; displayName?: string; icon?: string };
+type ToolActivity = { server: string; tool: string; displayName?: string; icon?: string; phase?: "start" | "done" | "error" };
 
 function ToolActivityLabel({ activity }: { activity: ToolActivity }) {
+  if (activity.server === "drwriter_exa" && /search/i.test(activity.tool)) return <WebSearch sources={[]} status={activity.phase === "start" ? "searching" : "done"} label={activity.phase === "error" ? "Web search failed" : activity.phase === "done" ? "Web search complete" : "Searching the web"} defaultOpen={false} />;
   const knownIcons = ["github", "googledrive", "linear", "notion"];
   const name = activity.server.toLowerCase().replace(/[^a-z0-9]/g, "");
   const icon = activity.icon || knownIcons.find((item) => name.includes(item));
   return <div className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
     {icon && knownIcons.includes(icon) ? <img src={`/mcp-logos/${icon}.svg`} alt="" className="size-4 shrink-0 dark:rounded-sm dark:bg-white dark:p-0.5" /> : <Bot aria-hidden="true" className="size-4 shrink-0" />}
-    <span>Using {activity.displayName || activity.server}: {activity.tool}</span>
+    <span>{activity.phase === "error" ? "Failed" : activity.phase === "done" ? "Used" : "Using"} {activity.displayName || activity.server}: {activity.tool}</span>
   </div>;
 }
 
@@ -144,7 +150,7 @@ function GeminiChatPanel({
       <div className={docMode ? "px-4 pt-2" : "relative min-h-0 flex-1"}>
       <div ref={messagesRef} className={docMode ? "" : "h-full overflow-y-auto p-3"}>
         <div className="flex flex-col gap-2">
-          {docMode ? <><p role="status" className="whitespace-pre-wrap text-sm text-muted-foreground">{docStatus}</p>{data?.documentChat?.filter((item) => item.streaming).flatMap((item) => item.toolActivity ?? []).map((activity, i) => <ToolActivityLabel key={i} activity={activity} />)}</> : <>{chatLoading ? <ChatMessagesSkeleton /> : data?.documentChat?.length === 0 ? (
+          {docMode ? <>{geminiLoading && <AiStatus state="writing" label="Updating your document" timer={false} />}<p role="status" className="whitespace-pre-wrap text-sm text-muted-foreground">{docStatus}</p>{data?.documentChat?.filter((item) => item.streaming).flatMap((item) => item.toolActivity ?? []).map((activity, i) => <ToolActivityLabel key={i} activity={activity} />)}</> : <>{chatLoading ? <ChatMessagesSkeleton /> : data?.documentChat?.length === 0 ? (
             <div className="px-4 text-muted-foreground">Enter prompt for {currentModel} response</div>
           ) : (
             data?.documentChat?.map((item, index) => (
@@ -163,11 +169,12 @@ function GeminiChatPanel({
                     {item.retryable !== false ? <button className="mt-2 font-semibold underline disabled:opacity-50" disabled={geminiLoading} onClick={() => retrySend(index)}>Retry</button> : <p className="mt-2">Check whether any tool made changes before submitting again.</p>}
                   </div>
                 ) : <div className="flex flex-col items-end gap-1">
-                  {item.streaming && item.toolActivity?.map((activity, i) => (
+                  {item.streaming && !item.toolActivity?.length && <AiStatus state="thinking" timer={false} />}
+                  {item.toolActivity?.map((activity, i) => (
                     <ToolActivityLabel key={i} activity={activity} />
                   ))}
                   <div className="min-w-0 max-w-full overflow-hidden rounded-md bg-green-400 p-3 text-sm text-black [&_a]:break-all [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-black/40 [&_blockquote]:pl-3 [&_code]:break-words [&_code]:rounded [&_code]:bg-black/10 [&_code]:px-1 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_h3]:font-semibold [&_li]:ml-4 [&_ol]:list-decimal [&_p+p]:mt-2 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-black/10 [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_ul]:list-disc">
-                    {item.response ? <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={["img"]} components={{
+                    {item.streaming && item.response ? <StreamingResponse text={item.response} status="streaming" actions={false} /> : item.response ? <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={["img"]} components={{
                       table: ({ children }) => <div className="my-2 max-w-full overflow-x-auto"><table className="min-w-max border-collapse text-left">{children}</table></div>,
                       th: ({ children }) => <th className="border border-black/30 px-2 py-1 align-top">{children}</th>,
                       td: ({ children }) => <td className="max-w-xs whitespace-normal border border-black/30 px-2 py-1 align-top">{children}</td>,
@@ -212,7 +219,30 @@ function GeminiChatPanel({
                 {matchingModels.map((model, index) => <button type="button" id={`model-option-${index}`} role="option" aria-selected={index === modelIndex} data-index={index} key={model} onMouseEnter={() => setModelIndex(index)} onClick={() => { currentModelSetter(model); setPrompt(""); }} className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent ${index === modelIndex ? "bg-accent" : ""}`}><ModelLogo model={model} />{model}{model === currentModel ? " ✓" : ""}</button>)}
               </div>}
 
-              <div className="mt-2 flex">
+              {docMode ? <PromptBox
+                className="w-full max-w-none"
+                value={prompt}
+                onValueChange={setPrompt}
+                onSubmit={() => {
+                  if (isModelCommand && matchingModels[modelIndex]) { currentModelSetter(matchingModels[modelIndex]); setPrompt(""); }
+                  else if (!prompt.startsWith("/")) void handleActions();
+                }}
+                disabled={geminiLoading}
+                efforts={[{ id: "default", label: "Send" }]}
+                hint={null}
+                placeholder="Describe changes to your document…"
+                inputProps={{
+                  "aria-label": "Describe changes to your document",
+                  "aria-controls": isModelCommand ? "model-options" : undefined,
+                  "aria-activedescendant": isModelCommand && matchingModels.length ? `model-option-${modelIndex}` : undefined,
+                  onKeyDown: (e) => {
+                    if (isModelCommand && matchingModels.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                      e.preventDefault();
+                      setModelIndex((index) => (index + (e.key === "ArrowDown" ? 1 : -1) + matchingModels.length) % matchingModels.length);
+                    }
+                  },
+                }}
+              /> : <div className="mt-2 flex">
                 <Input
                   type="text"
                   value={prompt}
@@ -231,7 +261,7 @@ function GeminiChatPanel({
                   }}
                 />
                 <SendHorizontal onClick={() => { if (!prompt.startsWith("/")) (docMode || actionMode) ? handleActions() : handleSend(); }} className="m-2 cursor-pointer text-xl" />
-              </div>
+              </div>}
             </div>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -242,7 +272,7 @@ function GeminiChatPanel({
 
 export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docMode, setDocMode, citation, setCitation }: GeminiChatBarProps) {
   const { user, loading } = useUser();
-  const { editor } = useSharedEditor();
+  const { editor, presentation } = useSharedEditor();
   const auth = getAuth();
   const [prompt, setPrompt] = useState<string>('');
   const [geminiLoading, setGeminiLoading] = useState<boolean>(false);
@@ -259,8 +289,40 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
     queryFn: () => getChatsForDocument(documentId)
   });
 
+  const saveAction = async (actionPrompt: string, response: string) => {
+    try {
+      await apiClient.post(`/document/actions/${documentId}/history`, { prompt: actionPrompt, response });
+    } catch {
+      toast.error("The action was completed, but its history could not be saved.");
+    }
+  };
+
   const handleActions = async () => {
-    if (!editor?.commands || !prompt.trim() || geminiLoading) return;
+    if (!prompt.trim() || geminiLoading) return;
+    if (presentation?.current) {
+      setGeminiLoading(true);
+      setDocStatus("Editing slides…");
+      try {
+        await presentation.current(prompt, currentModel);
+        setPrompt(current => current === prompt ? "" : current);
+        queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => ({
+          ...(old ?? { documentChat: [] }),
+          documentChat: [
+            ...(old?.documentChat ?? []),
+            { prompt, response: "Slides updated. Save to keep your changes.", documentId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          ],
+        }));
+        await saveAction(prompt, "Slides updated. Save to keep your changes.");
+        setDocStatus("Slides updated. Save to keep your changes.");
+        toast.success("Slides updated");
+      } catch (error) {
+        const message = isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "Could not edit slides.";
+        setDocStatus(message);
+        toast.error(message);
+      } finally { setGeminiLoading(false); }
+      return;
+    }
+    if (!editor?.commands) { toast.error("Wait for the editor to open."); return; }
     setGeminiLoading(true);
     setDocStatus("Applying changes…");
 
@@ -289,6 +351,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
       const res = await apiClient.post(`/document/actions/${documentId}`, { command, modelName: currentModel, content: JSON.parse(contentBeforeRequest) });
       const { updatedContent, question } = res.data;
       if (question) {
+        await saveAction(currentPrompt, question);
         setPendingQuestion({ command, question });
         setDocStatus(question);
         queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => old && ({ ...old, documentChat: old.documentChat.map((item, index) => index === old.documentChat.length - 1 ? { ...item, response: question } : item) }));
@@ -299,7 +362,8 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
       setDocStatus("Document updated.");
       editor.commands.setContent(updatedContent, { emitUpdate: true });
       editor.commands.focus();
-      queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => old && ({ ...old, documentChat: old.documentChat.map((item, index) => index === old.documentChat.length - 1 ? { ...item, response: "Applied changes to the document." } : item) }));
+      await saveAction(currentPrompt, "Applied changes to the document. Save to keep your changes.");
+      queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => old && ({ ...old, documentChat: old.documentChat.map((item, index) => index === old.documentChat.length - 1 ? { ...item, response: "Applied changes to the document. Save to keep your changes." } : item) }));
       toast.success("Document updated");
     } catch (err) {
       setPrompt(currentPrompt);
@@ -375,9 +439,13 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
           if (payload.error) { retryable = payload.retryable === true && toolActivity.length === 0; throw new Error(payload.error); }
           if (payload.type === "mcp_warning") updateChat({ mcpWarnings: payload.servers });
           if (payload.type === "tool") {
-            toolActivity.push({ server: payload.server, tool: payload.tool, displayName: payload.displayName, icon: payload.icon });
+            if (payload.phase === "done" || payload.phase === "error") {
+              const last = toolActivity.findLastIndex((activity) => activity.server === payload.server && activity.tool === payload.tool && activity.phase === "start");
+              if (last >= 0) toolActivity[last] = { ...toolActivity[last], phase: payload.phase };
+            } else toolActivity.push({ server: payload.server, tool: payload.tool, displayName: payload.displayName, icon: payload.icon, phase: "start" });
             updateChat({ toolActivity: [...toolActivity] });
           }
+          if (payload.type === "reset") { responseText = ""; updateChat({ response: "" }); }
           if (payload.type === "done") {
             console.log("Usage tokens:", payload.usageToken);
             updateChat({ streaming: false, toolCount: payload.toolCount, updatedAt: new Date().toISOString() });

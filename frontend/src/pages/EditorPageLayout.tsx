@@ -17,7 +17,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 const EditorPageLayout = ({ children }: { children: ReactNode }) => {
   const { id } = useParams();
-  const { editor } = useSharedEditor();
+  const { editor, docMode, setDocMode } = useSharedEditor();
   const [citation, setCitation] = useState("");
   const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
   const isMobile = useIsMobile();
@@ -26,7 +26,6 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_DESKTOP_SPLIT);
   const [isDragging, setIsDragging] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
-  const [docMode, setDocMode] = useState(() => localStorage.getItem("drwriter.assistantLayout") === "dock");
 
   useEffect(() => {
     if (!editor) return;
@@ -107,7 +106,7 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
           <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
             {!docMode && <SidebarTrigger className={`absolute ${side === "right" ? "right-4" : "left-4"} top-4 z-20 md:hidden`} />}
             {docMode && <div className="absolute bottom-4 left-3 right-3 z-30"><GeminiChatBar documentId={id} mode="mobile" docMode={docMode} setDocMode={setDocMode} citation={citation} setCitation={setCitation} /></div>}
-            <div className="flex h-full min-h-0 w-full min-w-0 justify-center px-3 pb-3 pt-16">
+            <div className="editor-content flex h-full min-h-0 w-full min-w-0 justify-center px-3 pb-3 pt-16">
               {children}
             </div>
           </main>
@@ -161,7 +160,7 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
         >
           {side === "left" ? (chatOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />) : (chatOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />)}
         </button>}
-        <div className={`flex h-full min-h-0 w-full min-w-0 justify-center overflow-hidden px-4 py-4 md:px-6 ${side === "right" ? "pr-12 md:pr-12" : "pl-12 md:pl-12"}`}>
+        <div className={`editor-content flex h-full min-h-0 w-full min-w-0 justify-center overflow-hidden px-4 py-4 md:px-6 ${side === "right" ? "pr-12 md:pr-12" : "pl-12 md:pl-12"}`}>
           {children}
         </div>
       </main>
