@@ -13,6 +13,7 @@ import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { ArrowLeft, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function PresentationEditor({ id, title, pptx, revision }: {
   id: string; title: string; pptx?: string; revision: number;
@@ -33,6 +34,7 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
   const query = useQueryClient();
   const { presentation, docMode } = useSharedEditor();
   const navigate = useNavigate();
+  const { theme } = useTheme();
 
   useEffect(() => {
     if (!editor || !presentation) return;
@@ -114,6 +116,6 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
       <button type="button" aria-label="Download presentation" title="Download presentation" disabled={!editor} onClick={() => save(true)} className="flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 hover:bg-accent disabled:opacity-50">
         <Download size={16} /> <span className="hidden sm:inline">Download .pptx</span>
       </button></header>
-    <PptxEditor className={`min-h-0 flex-1 ${docMode ? "pb-24" : ""}`} document={bytes} mode="edit" notesPane={{ defaultOpen: false }} onReady={setEditor} />
+    <PptxEditor className={`min-h-0 flex-1 ${docMode ? "pb-24" : ""}`} document={bytes} mode="edit" colorMode={theme} notesPane={{ defaultOpen: false }} onReady={setEditor} />
   </section>;
 }
