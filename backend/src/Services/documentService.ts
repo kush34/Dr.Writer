@@ -144,11 +144,11 @@ export const updateDocument = async (
   return updatedDocument;
 };
 
-export const savePresentation = async (userId: string, id: string, revision: number, pptx: string) => {
+export const savePresentation = async (userId: string, id: string, revision: number, pptx: string, title?: string) => {
   const document = await getDocumentData(userId, id);
   if (document.kind !== "presentation") throw new AppError(400, "Expected a presentation");
   const saved = await Document.updateOne({ _id: id, revision, $or: [{ user_id: userId }, { users: userId }] },
-    { $set: { pptx, editedAt: new Date() }, $inc: { revision: 1 } });
+    { $set: { pptx, ...(title ? { title } : {}), editedAt: new Date() }, $inc: { revision: 1 } });
   if (!saved.modifiedCount) throw new AppError(409, "A newer presentation was saved. Download your edits before reloading.");
   return revision + 1;
 };

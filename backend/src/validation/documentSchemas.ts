@@ -3,6 +3,7 @@ import { z } from "zod";
 export const savePresentationSchema = z.object({
   pptx: z.string().max(8 * 1024 * 1024).base64().startsWith("UEsDB"),
   revision: z.number().int().nonnegative(),
+  title: z.string().trim().min(1).max(255).optional(),
 });
 export const presentationOutline = z.array(z.array(z.string().max(2000).nullable()).max(300)).max(300);
 export const presentationPlan = z.array(z.discriminatedUnion("type", [

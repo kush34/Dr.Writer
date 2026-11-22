@@ -11,6 +11,7 @@ test("presentation actions and saves enforce document access, kind, and revision
   const pptx = readFileSync(resolve(__dirname, "../../frontend/src/assets/blank.pptx")).toString("base64");
   assert.equal(createDocumentSchema.parse({ title: "Legacy" }).kind, "document");
   assert.ok(savePresentationSchema.safeParse({ pptx, revision: 0 }).success);
+  assert.equal(savePresentationSchema.parse({ pptx, revision: 0, title: "Renamed deck" }).title, "Renamed deck");
   const doc = { kind: "presentation", revision: 0, user_id: "owner", users: ["member"] };
   t.mock.method(Document, "create", async properties => properties);
   assert.equal((await createDocument("owner", "Slides", "presentation")).kind, "presentation");
@@ -20,6 +21,7 @@ test("presentation actions and saves enforce document access, kind, and revision
     if (filter.revision !== doc.revision) return { modifiedCount: 0 };
     doc.revision += change.$inc.revision;
     doc.pptx = change.$set.pptx;
+    if (change.$set.title) doc.title = change.$set.title;
     return { modifiedCount: 1 };
   });
   const plan = [{ type: "append", title: "Overview", body: "Project status" }];
@@ -35,7 +37,8 @@ test("presentation actions and saves enforce document access, kind, and revision
   model.mock.mockImplementation(async () => '{"operations":[{"type":"unknown"}]}');
   await assert.rejects(edit("owner"), { statusCode: 502 });
   await assert.rejects(savePresentation("outsider", "deck", 0, pptx), { statusCode: 403 });
-  assert.equal(await savePresentation("member", "deck", 0, pptx), 1);
+  assert.equal(await savePresentation("member", "deck", 0, pptx, "Renamed deck"), 1);
+  assert.equal(doc.title, "Renamed deck");
   await assert.rejects(savePresentation("owner", "deck", 0, pptx), { statusCode: 409 });
   for (const save of [syncDocument, updateDocument]) {
     await assert.rejects(save("owner", "deck", "Oops", {}), { statusCode: 400 });

@@ -17,7 +17,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 const EditorPageLayout = ({ children }: { children: ReactNode }) => {
   const { id } = useParams();
-  const { editor } = useSharedEditor();
+  const { editor, docMode, setDocMode } = useSharedEditor();
   const [citation, setCitation] = useState("");
   const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
   const isMobile = useIsMobile();
@@ -26,7 +26,6 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_DESKTOP_SPLIT);
   const [isDragging, setIsDragging] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
-  const [docMode, setDocMode] = useState(() => localStorage.getItem("drwriter.assistantLayout") === "dock");
 
   useEffect(() => {
     if (!editor) return;

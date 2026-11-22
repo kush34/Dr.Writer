@@ -11,11 +11,15 @@ import { readOutline, applyPresentationEdits } from "@/service/presentation";
 import apiClient from "@/service/axiosConfig";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
+import { ArrowLeft, Download } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function PresentationEditor({ id, title, pptx, revision }: {
   id: string; title: string; pptx?: string; revision: number;
 }) {
   const [bytes] = useState(() => Uint8Array.from(atob(pptx ?? blank.split(",")[1]), c => c.charCodeAt(0)));
+  const [localTitle, setLocalTitle] = useState(title);
+  const [savedTitle, setSavedTitle] = useState(title);
   const [editor, setEditor] = useState<PptxEditorInstance>();
   const [saving, setSaving] = useState(false);
   const [editRevision, setEditRevision] = useState(0);
@@ -23,11 +27,12 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
   const attempted = useRef<number>();
   const inFlight = useRef(false);
   const autosave = useAutosave();
-  const dirty = savedRevision !== editRevision;
+  const dirty = savedRevision !== editRevision || savedTitle !== localTitle;
   const blocker = useBlocker(dirty || saving);
   const version = useRef(revision);
   const query = useQueryClient();
-  const { presentation } = useSharedEditor();
+  const { presentation, docMode } = useSharedEditor();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!editor || !presentation) return;
@@ -47,6 +52,8 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
   const save = useCallback(async (download: boolean) => {
     if (!download && inFlight.current) return;
     const snapshot = editor?.session?.store.revision ?? 0;
+    const rawTitle = localTitle;
+    const titleSnapshot = rawTitle.trim() || "Untitled presentation";
     if (!download) attempted.current = snapshot;
     const result = editor?.save();
     if (!result) { toast.error("Unable to export the presentation."); return; }
@@ -54,7 +61,7 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
       const url = URL.createObjectURL(new Blob([result], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = title + ".pptx";
+      link.download = titleSnapshot + ".pptx";
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       return;
@@ -66,16 +73,18 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
       let binary = "";
       for (let i = 0; i < result.length; i += 32768) binary += String.fromCharCode(...result.subarray(i, i + 32768));
       const pptx = btoa(binary);
-      const { data } = await apiClient.post(`/document/${id}/presentation`, { pptx, revision: version.current });
+      const { data } = await apiClient.post(`/document/${id}/presentation`, { pptx, revision: version.current, title: titleSnapshot });
       version.current = data.revision;
       setSavedRevision(snapshot);
-      query.setQueryData(["document", id], (old: object | undefined) => old && ({ ...old, pptx, revision: data.revision }));
+      setSavedTitle(titleSnapshot);
+      setLocalTitle(current => current === rawTitle ? titleSnapshot : current);
+      query.setQueryData(["document", id], (old: object | undefined) => old && ({ ...old, title: titleSnapshot, pptx, revision: data.revision }));
       query.invalidateQueries({ queryKey: ["documents"] });
       toast.success("Presentation saved");
     } catch (err) {
       toast.error(isAxiosError(err) ? err.response?.data?.message || "Save failed. Download a copy before leaving." : String(err));
     } finally { inFlight.current = false; setSaving(false); }
-  }, [editor, id, title, query]);
+  }, [editor, id, localTitle, query]);
 
   useEffect(() => {
     if (!autosave || !dirty || saving || attempted.current === editRevision) return;
@@ -95,10 +104,16 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
       <button onClick={() => blocker.reset()}>Stay</button>
       <button disabled={saving} onClick={() => blocker.proceed()}>Discard and leave</button>
     </div>}
-    <header className="flex items-center gap-4 pb-2"><strong className="mr-auto truncate">{title}</strong>
+    <header className="flex items-center gap-3 pb-2">
+      <button type="button" aria-label="Back to documents" title="Back to documents" onClick={() => navigate("/home")} className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+        <ArrowLeft size={18} />
+      </button>
+      <input aria-label="Presentation title" maxLength={255} value={localTitle} onChange={event => setLocalTitle(event.target.value)} className="mr-auto min-w-0 flex-1 rounded bg-transparent px-2 text-lg font-bold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" />
       <label><input type="checkbox" checked={autosave} onChange={event => { attempted.current = undefined; setAutosave(event.target.checked); }} /> Autosave</label>
       <button disabled={!editor || saving} onClick={() => save(false)}>{saving ? "Saving…" : "Save"}</button>
-      <button disabled={!editor} onClick={() => save(true)}>Download .pptx</button></header>
-    <PptxEditor className="min-h-0 flex-1" document={bytes} mode="edit" onReady={setEditor} />
+      <button type="button" aria-label="Download presentation" title="Download presentation" disabled={!editor} onClick={() => save(true)} className="flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 hover:bg-accent disabled:opacity-50">
+        <Download size={16} /> <span className="hidden sm:inline">Download .pptx</span>
+      </button></header>
+    <PptxEditor className={`min-h-0 flex-1 ${docMode ? "pb-24" : ""}`} document={bytes} mode="edit" notesPane={{ defaultOpen: false }} onReady={setEditor} />
   </section>;
 }

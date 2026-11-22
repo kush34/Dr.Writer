@@ -226,9 +226,9 @@ export const registerDocumentRoutes = (router: Router) => {
   });
   router.post("/:documentId/presentation", firebaseTokenVerify, async (req, res) => {
     try {
-      const { pptx, revision } = savePresentationSchema.parse(req.body);
+      const { pptx, revision, title } = savePresentationSchema.parse(req.body);
       const { documentId } = documentActionParamsSchema.parse(req.params);
-      const nextRevision = await savePresentation(requireAuthenticatedUser(req), documentId, revision, pptx);
+      const nextRevision = await savePresentation(requireAuthenticatedUser(req), documentId, revision, pptx, title);
       res.json({ revision: nextRevision });
     } catch (error) { handleControllerError(res, error); }
   });
