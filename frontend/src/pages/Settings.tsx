@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { ModeToggle } from "@/components/ThemeToggleBtn";
 import { availableModels, getDefaultModel, setDefaultModel } from "@/config/models";
 import { McpSettings } from "@/components/McpSettings";
+import { setAutosave, useAutosave } from "@/config/autosave";
 
 export default function Settings() {
   const side = useSidebarSide();
+  const autosave = useAutosave();
   const [searchParams, setSearchParams] = useSearchParams();
   const [model, setModel] = useState(getDefaultModel);
   const [mcpOpen, setMcpOpen] = useState(false);
@@ -30,6 +32,11 @@ export default function Settings() {
           <select id="default-model" value={model} onChange={(event) => { setModel(event.target.value); setDefaultModel(event.target.value); toast.success("Default model updated"); }} className="w-full rounded-md border border-input bg-background p-2 text-sm">
             {availableModels.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
+        </section>
+        <section className="space-y-2 border-t pt-4">
+          <Label htmlFor="document-autosave">Document autosave</Label>
+          <p className="text-sm text-muted-foreground">Automatically save document changes after you stop editing. This preference is stored in this browser.</p>
+          <select id="document-autosave" value={autosave ? "on" : "off"} onChange={(event) => setAutosave(event.target.value === "on")} className="w-full rounded-md border border-input bg-background p-2 text-sm"><option value="off">Off</option><option value="on">On</option></select>
         </section>
         <section className="space-y-2 border-t pt-4">
           <Label htmlFor="sidebar-side">Sidebar position</Label>

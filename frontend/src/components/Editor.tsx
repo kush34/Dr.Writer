@@ -1,9 +1,9 @@
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { useParams } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchDocumentData, updateDocumentApi } from "@/service/document";
-import { addDocument, syncData } from "@/service/IndexDb";
-import { Editor as tEditor, generateJSON, JSONContent } from "@tiptap/react";
+import { addDocument, deleteDocument, syncData } from "@/service/IndexDb";
+import { generateJSON, JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
@@ -14,7 +14,15 @@ import { EditorSkeleton } from "@/components/PageSkeleton";
 
 const normalizeContent = (content: any): JSONContent => {
   if (typeof content === "object" && content?.type === "doc") return content;
-  if (typeof content === "string") return generateJSON(content, [StarterKit, TextStyle, Color, TextAlign]);
+  if (typeof content === "string") {
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed?.type === "doc") return parsed;
+    } catch {
+      // Existing imported documents may contain HTML rather than JSON.
+    }
+    return generateJSON(content, [StarterKit, TextStyle, Color, TextAlign]);
+  }
   return { type: "doc", content: [{ type: "paragraph" }] };
 };
 
@@ -45,31 +53,23 @@ const Editor = ({ onEditorReady }: EditorProps) => {
 
 
 
-  const updateMutation = useMutation({
-    mutationFn: updateDocumentApi,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["documents"] });
-      queryClient.setQueryData(["documents"], (old: any) => old && ({ ...old, documents: old.documents.map((item: any) => item._id === variables.id ? { ...item, title: variables.title, editedAt: new Date().toISOString() } : item) }));
-      return { toastId: toast.loading("Saving document…") };
-    },
-    onSuccess: (_result, _variables, context) => {
-      toast.success("Document saved", { id: context?.toastId });
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
-    },
-    onError: async (_, variables, context) => {
+  const updateDocument = async (content: JSONContent, title: string, automatic: boolean) => {
+    await queryClient.cancelQueries({ queryKey: ["document", id], exact: true });
+    try {
+      await updateDocumentApi({ id, title, content });
+      await deleteDocument(id);
+      if (!automatic) toast.success("Document saved");
+    } catch {
       try {
-        await addDocument({ _id: variables.id, title: variables.title, newContent: variables.content });
-        toast.warning("Saved offline", { id: context?.toastId, description: "Changes will sync when you reconnect." });
+        await addDocument({ _id: id, title, newContent: content });
+        toast.warning("Saved offline", { description: "Changes will sync when you reconnect." });
       } catch {
-        toast.error("Could not save document", { id: context?.toastId });
-        queryClient.invalidateQueries({ queryKey: ["documents"] });
+        toast.error("Could not save document");
+        throw new Error("Could not save document");
       }
-    },
-  });
-
-  const updateDocument = (editor: tEditor, title: string) => {
-    if (!editor || !data) return;
-    updateMutation.mutate({ id, title: title, content: editor.getJSON() });
+    }
+    queryClient.setQueryData<DocumentDTO>(["document", id], (previous) => previous && ({ ...previous, title, content }));
+    queryClient.invalidateQueries({ queryKey: ["documents"] });
   };
 
   if (userLoading || isLoading) return <EditorSkeleton />;
@@ -78,7 +78,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
   if (!data) return <p>No document data</p>;
   return (
     <div className="Editor flex h-full min-h-0 w-full min-w-0 overflow-hidden">
-      <SimpleEditor title={data.title} content={data.content} onEditorReady={onEditorReady} updateDocument={updateDocument} />
+      <SimpleEditor key={id} title={data.title} content={data.content} onEditorReady={onEditorReady} updateDocument={updateDocument} />
     </div>
   );
 };
