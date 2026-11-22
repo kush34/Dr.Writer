@@ -1,3 +1,4 @@
+import { getOpenRouterKey } from "../service/openrouterAuth";
 import { presentationPlan } from "../validation/documentSchemas";
 import { Response } from "express";
 import { documentText, searchExcerpt } from "../utils/documentSearch";
@@ -187,6 +188,7 @@ export const performDocumentAction = async (
     throw new AppError(403, "Document not found");
   }
 
+  const apiKey = await getOpenRouterKey(userId);
   if (document.kind === "presentation") {
     if (!outline) throw new AppError(400, "Open the presentation before requesting edits");
     const raw = await openRouterComplete(
@@ -198,7 +200,7 @@ Allowed operations:
 The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for every new slide.
 The outline lists each slide and its shapes in zero-based order. Null means non-text. Keep unrelated content.
 Outline: ${JSON.stringify(outline)}
-Request: ${command}`, modelName || "openai/gpt-4o-mini");
+Request: ${command}`, modelName || "openai/gpt-4o-mini", apiKey);
     const parsed = presentationPlan.safeParse(extractJsonPayload(raw)?.operations);
     if (!parsed.success) throw new AppError(502, "Invalid presentation edits from model");
     const invalid = parsed.data.some(op => op.type !== "append" &&
@@ -242,7 +244,7 @@ ${JSON.stringify(content)}
 
 Command:
 ${command}`,
-    modelName || "openai/gpt-4o-mini"
+    modelName || "openai/gpt-4o-mini", apiKey
   );
 
   let llmResponse: { operations?: unknown[]; question?: string };
@@ -294,6 +296,8 @@ export const streamUserPrompt = async (
   try {
     await getDocumentData(userId, documentId);
     let tokenCount = 0;
+    const apiKey = await getOpenRouterKey(userId);
+    if (!apiKey) {
     const reservedUser = await User.findOneAndUpdate(
       { _id: userId, token_balance: { $gte: MAX_TOKENS_PER_REQUEST } },
       { $inc: { token_balance: -MAX_TOKENS_PER_REQUEST } },
@@ -305,6 +309,7 @@ export const streamUserPrompt = async (
     }
     reserved = true;
     reservedTokens = MAX_TOKENS_PER_REQUEST;
+    }
     const userConfig = await getMcpConfig(userId);
     const config = { mcpServers: { ...userConfig.mcpServers, drwriter_exa: { url: "https://mcp.exa.ai/mcp", displayName: "Exa web search" } } };
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -332,6 +337,7 @@ export const streamUserPrompt = async (
         }, (tokens) => {
           modelTokens += tokens;
         }, async (tokens) => {
+          if (apiKey) return;
           const additional = modelTokens + tokens - reservedTokens;
           if (additional <= 0) return;
           const user = await User.findOneAndUpdate(
@@ -342,7 +348,7 @@ export const streamUserPrompt = async (
           if (!user) throw new AppError(402, "Insufficient token balance for the next model request.");
           reservedTokens += additional;
         }, (chunk) => res.write(`data: ${JSON.stringify({ chunk })}\n\n`),
-        () => res.write(`data: ${JSON.stringify({ type: "reset" })}\n\n`));
+        () => res.write(`data: ${JSON.stringify({ type: "reset" })}\n\n`), apiKey);
         // Providers that return JSON despite stream=true have not emitted chunks.
         if (!result.streamed) res.write(`data: ${JSON.stringify({ chunk: result.text })}\n\n`);
         await finish(result.text, result.count);
@@ -356,7 +362,8 @@ export const streamUserPrompt = async (
       (text) => {
         res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
       },
-      finish
+      finish,
+      apiKey
     );
   } catch (error) {
     console.error("OpenRouter stream error:", error);

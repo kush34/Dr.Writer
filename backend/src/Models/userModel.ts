@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
         default: USER_TOKEN_ALLOWANCE,
     },
     token_allowance_version: { type: Number, default: 3 },
+    openrouter_key: { type: String, select: false },
     mcp_config: { type: String, select: false }
 })
 

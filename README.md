@@ -68,6 +68,8 @@ The auth emulator saves accounts when it stops cleanly; removing Docker volumes 
 Not available without real keys: image upload (Cloudinary) and AI features (OpenRouter).
 Leave `CLOUDINARY_*` / `OPEN_ROUTER_API_KEY` empty to keep them disabled, or fill them in to enable.
 
+For Settings → Connect OpenRouter, set `MCP_ENCRYPTION_KEY` in the backend environment to a persistent, random 64-character hexadecimal key (generate one with `openssl rand -hex 32`). It encrypts saved credentials; changing it makes existing OpenRouter and MCP credentials unreadable. Use HTTPS in production. Disconnecting removes the saved key from Dr.Writer; users can also revoke it in OpenRouter settings.
+
 ### Run without Docker
 
 # Prerequisites
