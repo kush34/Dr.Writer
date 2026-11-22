@@ -1,3 +1,6 @@
+import User from "../Models/userModel";
+import { saveOpenRouterKey } from "../service/openrouterAuth";
+import { z } from "zod";
 import { Request, Response, Router } from "express";
 import firebaseTokenVerify from "../Middlewares/firebaseTokenVerify";
 import { getUserProfile, verifyFirebaseTokenAndEnsureUser } from "../Services/userService";
@@ -41,4 +44,32 @@ export const registerUserRoutes = (router: Router) => {
   router.get("/", healthCheck);
   router.post("/firebaseTokenVerify", firebaseTokenVerifyHandler);
   router.get("/user", firebaseTokenVerify, getUserHandler);
+  router.get("/openrouter", firebaseTokenVerify, async (req, res) => {
+    try {
+      const user = await User.findById(requireAuthenticatedUser(req)).select("+openrouter_key");
+      if (!user) throw new AppError(404, "User not found.");
+      res.set("Cache-Control", "no-store").json({ connected: !!user.openrouter_key });
+    } catch (error) { handleControllerError(res, error); }
+  });
+  router.post("/openrouter", firebaseTokenVerify, async (req, res) => {
+    try {
+      const { code, verifier } = z.object({ code: z.string().min(1).max(2048), verifier: z.string().regex(/^[A-Za-z0-9_-]{43,128}$/) }).strict().parse(req.body);
+      const response = await fetch("https://openrouter.ai/api/v1/auth/keys", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, code_verifier: verifier, code_challenge_method: "S256" }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) throw new AppError(502, "OpenRouter authorization failed. Please try connecting again.");
+      const data = await response.json();
+      if (typeof data.key !== "string" || !data.key.startsWith("sk-or-")) throw new AppError(502, "OpenRouter returned an invalid credential.");
+      await saveOpenRouterKey(requireAuthenticatedUser(req), data.key);
+      res.set("Cache-Control", "no-store").json({ connected: true });
+    } catch (error) { handleControllerError(res, error); }
+  });
+  router.delete("/openrouter", firebaseTokenVerify, async (req, res) => {
+    try {
+      await User.updateOne({ _id: requireAuthenticatedUser(req) }, { $unset: { openrouter_key: 1 } });
+      res.set("Cache-Control", "no-store").json({ connected: false });
+    } catch (error) { handleControllerError(res, error); }
+  });
 };

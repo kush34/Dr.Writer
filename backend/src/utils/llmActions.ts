@@ -1,81 +1,38 @@
-/**
- * EditOperation (DOCUMENTATION ONLY)
- *
- * LLM must return:
- *
- * {
- *   operations: [
- *     { type: "replace", from: number, to: number, text: string },
- *     { type: "insert", at: number, text: string },
- *     { type: "delete", from: number, to: number }
- *   ]
- * }
- *
- * No markdown. No backticks. No prose.
- */
+import { z } from "zod";
 
-import { NumberLiteralType } from "typescript";
-
-/**
- * Validate a single edit operation
- */
-
-type tReplace = {
-  type: "replace"
-  from: number;
-  to: number;
-  text: string
-}
-type tInsert = {
-  type: "insert"
-  at: number;
-  text: string
-}
-type tDelete = {
-  type: "delete"
-  from: number
-  to: number
-}
-export type tOps = tReplace | tInsert | tDelete
-export function isValidOp(op: tOps) {
-  if (!op || typeof op !== "object") return false;
-
-  switch (op.type) {
-    case "replace":
-      return (
-        Number.isInteger(op.from) &&
-        Number.isInteger(op.to) &&
-        op.from >= 0 &&
-        op.to >= op.from &&
-        typeof op.text === "string"
-      );
-
-    case "insert":
-      return (
-        Number.isInteger(op.at) &&
-        op.at >= 0 &&
-        typeof op.text === "string"
-      );
-
-    case "delete":
-      return (
-        Number.isInteger(op.from) &&
-        Number.isInteger(op.to) &&
-        op.from >= 0 &&
-        op.to >= op.from
-      );
-
-    default:
-      return false;
+const text = z.string().max(12000);
+const block = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("paragraph"), text }),
+  z.object({ type: z.literal("heading"), level: z.number().int().min(1).max(3), text: text.min(1) }),
+  z.object({ type: z.enum(["bulletList", "orderedList"]), items: z.array(text.min(1)).min(1).max(30) }),
+]);
+const payload = { text: text.optional(), blocks: z.array(block).min(1).max(50).optional() };
+export const documentOperations = z.array(z.discriminatedUnion("type", [
+  z.object({ type: z.literal("insert"), at: z.number().int().nonnegative(), ...payload }),
+  z.object({ type: z.literal("replace"), from: z.number().int().nonnegative(), to: z.number().int().nonnegative(), ...payload }),
+  z.object({ type: z.literal("delete"), from: z.number().int().nonnegative(), to: z.number().int().nonnegative() }),
+])).min(1).max(60).superRefine((ops, ctx) => {
+  for (const [i, op] of ops.entries()) {
+    if (op.type !== "delete" && (op.text === undefined) === (op.blocks === undefined)) ctx.addIssue({ code: "custom", path: [i], message: "Provide either text or blocks" });
+    if (op.type !== "insert" && op.to < op.from) ctx.addIssue({ code: "custom", path: [i], message: "End index precedes start" });
   }
-}
-
-/**
- * Validate + sanitize LLM response
- * Drops invalid ops instead of crashing your app
- */
-export function sanitizeOperations(ops:tOps[]) {
-  if (!Array.isArray(ops)) return [];
-
-  return ops.filter(isValidOp);
+});
+export type tOps = z.infer<typeof documentOperations>[number];
+export function validateDocumentOperations(value: unknown, blockCount: number): tOps[] {
+  const ops = documentOperations.parse(value);
+  const occupied = new Set<number>();
+  const positions = new Set<number>();
+  for (const op of ops) {
+    const start = op.type === "insert" ? op.at : op.from;
+    const end = op.type === "insert" ? op.at : op.to;
+    if (start > blockCount || (op.type !== "insert" && end >= blockCount)) throw new Error("Block index is out of range");
+    if (positions.has(start)) throw new Error("Operations share a starting position");
+    positions.add(start);
+    if (op.type !== "insert") for (let i = start; i <= end; i++) {
+      if (occupied.has(i)) throw new Error("Operations overlap");
+      occupied.add(i);
+    }
+  }
+  for (const op of ops) if (op.type === "insert" && occupied.has(op.at)) throw new Error("Insertion overlaps another edit");
+  return ops;
 }

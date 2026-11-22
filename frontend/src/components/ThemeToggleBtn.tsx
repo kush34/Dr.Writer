@@ -1,4 +1,4 @@
-import { toast } from "sonner"
+import { toast } from "@/components/ui/rare-toast"
 import { Moon, Sun } from "lucide-react"
 
 import { Button } from "@/components/ui/button"

@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const Document = require("../dist/Models/documentModel").default;
 const router = require("../dist/service/openrouter");
+const auth = require("../dist/service/openrouterAuth");
 const { createDocument, performDocumentAction, savePresentation, syncDocument, updateDocument } = require("../dist/Services/documentService");
 const { createDocumentSchema, savePresentationSchema } = require("../dist/validation/documentSchemas");
 const { readFileSync } = require("node:fs");
@@ -24,6 +25,7 @@ test("presentation actions and saves enforce document access, kind, and revision
     if (change.$set.title) doc.title = change.$set.title;
     return { modifiedCount: 1 };
   });
+  t.mock.method(auth, "getOpenRouterKey", async () => undefined);
   const plan = [{ type: "append", title: "Overview", body: "Project status" }];
   const model = t.mock.method(router, "openRouterComplete", async (prompt, name) => {
     assert.ok(prompt.includes("First slide"));

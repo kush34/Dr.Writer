@@ -8,7 +8,7 @@ import { generateJSON, JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/rare-toast";
 import { useUser } from "@/context/UserContext";
 import { DocumentDTO } from "@/types";
 import { EditorSkeleton } from "@/components/PageSkeleton";

@@ -13,12 +13,15 @@ const EditorPage = () => {
 };
 
 const EditorWorkspace = () => {
-  const presentation = React.useRef<((command: string, model: string) => Promise<void>) | null>(null);
+  const presentation = React.useRef<NonNullable<React.ContextType<typeof SharedEditorContext>["presentation"]>["current"]>(null);
+  const reviewPendingRef = React.useRef(false);
+  const [reviewPending, setPendingState] = useState(false);
+  const setReviewPending = (pending: boolean) => { reviewPendingRef.current = pending; setPendingState(pending); };
   const [editorInstance, setEditorInstance] = useState<TiptapEditor | null>(null);
   const [docMode, setDocMode] = useState(() => localStorage.getItem("drwriter.assistantLayout") === "dock");
 
   return (
-    <SharedEditorContext.Provider value={{ presentation, editor: editorInstance, setEditor: setEditorInstance, docMode, setDocMode }}>
+    <SharedEditorContext.Provider value={{ presentation, editor: editorInstance, setEditor: setEditorInstance, docMode, setDocMode, reviewPending, reviewPendingRef, setReviewPending }}>
       <UserContextProvider>
         <EditorPageLayout>
           <div id="editor" className="flex h-full min-h-0 w-full min-w-0 overflow-hidden">

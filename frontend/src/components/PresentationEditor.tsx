@@ -8,9 +8,10 @@ import "@pptx-editor.dev/core/styles/editor.css";
 import blank from "../assets/blank.pptx?url&inline";
 import { useSharedEditor } from "@/context/EditorContext";
 import { readOutline, applyPresentationEdits } from "@/service/presentation";
+import { requestEdit } from "@/service/editAction";
 import apiClient from "@/service/axiosConfig";
 import { isAxiosError } from "axios";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/rare-toast";
 import { ArrowLeft, Download, SaveAll } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/context/ThemeContext";
@@ -43,12 +44,17 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
     const host = createBrowserAutomationHost(editor);
     const unsubscribe = host.subscribe(() => setEditRevision(editor.session?.store.revision ?? 0));
     let active = true;
-    presentation.current = async (command, modelName) => {
+    presentation.current = async (command, modelName, onProgress, onPreview, onReview) => {
       if (!editor.session) throw new Error("Wait for the presentation to open.");
       const revision = host.revision();
-      const { data } = await apiClient.post(`/document/actions/${id}`, { command, modelName, outline: readOutline(host) });
+      const data = await requestEdit(id, { command, modelName, outline: readOutline(host) }, onProgress, onPreview);
       if (!active) throw new Error("The presentation was closed.");
-      applyPresentationEdits(host, revision, data.operations);
+      onProgress("Ready to review slide edits");
+      if (!await onReview(data.operations)) return false;
+      if (!active || !editor.session) throw new Error("The presentation was closed.");
+      onProgress("Applying slide edits");
+      applyPresentationEdits(host, revision, data.operations as Parameters<typeof applyPresentationEdits>[2]);
+      return true;
     };
     return () => { active = false; presentation.current = null; unsubscribe(); host.dispose(); };
   }, [editor, id, presentation]);

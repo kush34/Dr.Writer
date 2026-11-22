@@ -3,7 +3,7 @@ import { createUser } from '../firebaseAuth/firebaseConfig';
 import { Description } from '@radix-ui/react-toast';
 import { Loader } from 'lucide-react';
 import { Input } from './ui/input';
-import { toast } from "sonner"
+import { toast } from "@/components/ui/rare-toast"
 
 const Register = ({ setFlag }: { setFlag: React.Dispatch<React.SetStateAction<boolean>> }) => {
   const [email, setEmail] = useState('');

@@ -1,3 +1,6 @@
+import { requestEdit } from "@/service/editAction";
+import { summarizeEdits } from "@/service/editPreview";
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState } from "react";
 import {
   Sidebar, SidebarContent, SidebarGroupLabel,
@@ -16,22 +19,13 @@ import { useSharedEditor } from "@/context/EditorContext";
 import apiClient from "@/service/axiosConfig";
 import { isAxiosError } from "axios";
 import { getAuth } from "firebase/auth";
-import { toast } from "sonner";
-import { availableModels, getDefaultModel } from "@/config/models";
+import { toast } from "@/components/ui/rare-toast";
+import { getDefaultModel } from "@/config/models";
+import { ModelSelector } from "@/components/ModelSelector";
 import { ChatMessagesSkeleton } from "@/components/PageSkeleton";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-
-const providerLogos: Record<string, string> = {
-  google: "googlegemini", openai: "openai", qwen: "qwen",
-  nvidia: "nvidia", openrouter: "openrouter", deepseek: "deepseek",
-};
-
-function ModelLogo({ model }: { model: string }) {
-  const logo = providerLogos[model.split("/")[0].toLowerCase()];
-  return logo ? <img src={`/model-logos/${logo}.svg`} alt="" className="size-4 shrink-0 dark:rounded-sm dark:bg-white dark:p-0.5" /> : <Bot aria-hidden="true" className="size-4 shrink-0" />;
-}
 
 type ToolActivity = { server: string; tool: string; displayName?: string; icon?: string; phase?: "start" | "done" | "error" };
 
@@ -88,10 +82,10 @@ function GeminiChatPanel({
   retrySend,
   geminiLoading,
   currentModelSetter,
-  modelChanges, docMode, setDocMode, citation, setCitation, docStatus,
+  modelChanges, docMode, setDocMode, citation, setCitation, docStatus, editLoading, editPreview, reviewSummary, reviewInDocument, onReviewDecision,
 }: {
   docMode: boolean; setDocMode: (value: boolean) => void;
-  citation: string; setCitation: (value: string) => void; docStatus: string;
+  citation: string; setCitation: (value: string) => void; docStatus: string; editLoading: boolean; editPreview: string; reviewSummary: string | null; reviewInDocument: boolean; onReviewDecision: (accept: boolean) => void;
   data: DocumentChatResponse | undefined;
   chatLoading: boolean;
   currentModel: string;
@@ -107,15 +101,13 @@ function GeminiChatPanel({
   modelChanges: { index: number; from: string; to: string }[];
 }) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [modelIndex, setModelIndex] = useState(0);
-  const modelListRef = useRef<HTMLDivElement>(null);
+  const modelPickerRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const isModelCommand = /^\/model(?:\s|$)/i.test(prompt);
-  const matchingModels = isModelCommand ? availableModels.filter((model) => model.toLowerCase().includes(prompt.slice(6).trim().toLowerCase())) : [];
-  useEffect(() => { setModelIndex(0); }, [prompt]);
-  useEffect(() => {
-    modelListRef.current?.querySelector<HTMLElement>(`[data-index="${modelIndex}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [modelIndex]);
+  const openModelPicker = () => {
+    setPrompt("");
+    modelPickerRef.current?.querySelector<HTMLButtonElement>("button")?.click();
+  };
   const copyTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(copyTimer.current), []);
 
@@ -142,6 +134,11 @@ function GeminiChatPanel({
         setActionMode(!actionMode);
       }
     }}>
+      {reviewSummary && <section aria-label="Review proposed changes" className="space-y-3 border-b px-4 py-3">
+        <div><h3 className="text-sm font-semibold">Review changes</h3><p className="text-xs text-muted-foreground">{reviewInDocument ? "Changes are visible in the document. Accept them or discard to restore the previous version." : "Check the proposed edits before applying them."}</p></div>
+        {!reviewInDocument && <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{reviewSummary}</div>}
+        <div className="flex flex-wrap gap-2"><Button type="button" size="sm" onClick={() => onReviewDecision(true)}>Accept changes</Button><Button type="button" size="sm" variant="outline" onClick={() => onReviewDecision(false)}>Discard</Button></div>
+      </section>}
       {!docMode && <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
         <SidebarGroupLabel className="px-0 text-xl font-semibold">Dr. Writer</SidebarGroupLabel>
         <button type="button" aria-label="Switch to dock mode" title="Switch to dock mode" onClick={() => setDocMode(true)} className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"><PanelBottom size={16} /></button>
@@ -150,7 +147,7 @@ function GeminiChatPanel({
       <div className={docMode ? "px-4 pt-2" : "relative min-h-0 flex-1"}>
       <div ref={messagesRef} className={docMode ? "" : "h-full overflow-y-auto p-3"}>
         <div className="flex flex-col gap-2">
-          {docMode ? <>{geminiLoading && <AiStatus state="writing" label="Updating your document" timer={false} />}<p role="status" className="whitespace-pre-wrap text-sm text-muted-foreground">{docStatus}</p>{data?.documentChat?.filter((item) => item.streaming).flatMap((item) => item.toolActivity ?? []).map((activity, i) => <ToolActivityLabel key={i} activity={activity} />)}</> : <>{chatLoading ? <ChatMessagesSkeleton /> : data?.documentChat?.length === 0 ? (
+          {docMode ? <>{editLoading ? <AiStatus state="writing" label={docStatus || "Preparing edits"} timer={false} /> : <p role="status" className="whitespace-pre-wrap text-sm text-muted-foreground">{docStatus}</p>}{data?.documentChat?.filter((item) => item.streaming).flatMap((item) => item.toolActivity ?? []).map((activity, i) => <ToolActivityLabel key={i} activity={activity} />)}</> : <>{chatLoading ? <ChatMessagesSkeleton /> : data?.documentChat?.length === 0 ? (
             <div className="px-4 text-muted-foreground">Enter prompt for {currentModel} response</div>
           ) : (
             data?.documentChat?.map((item, index) => (
@@ -200,10 +197,12 @@ function GeminiChatPanel({
       {!docMode && !!data?.documentChat?.length && <button type="button" aria-label="Scroll to bottom of chat" title="Scroll to bottom" onClick={() => { const messages = messagesRef.current; if (messages) messages.scrollTo({ top: messages.scrollHeight, behavior: "smooth" }); }} className="absolute bottom-3 right-3 rounded-full border bg-background p-2 shadow-md hover:bg-accent"><ArrowDown size={16} /></button>}
       </div>
 
+      {editPreview && !reviewSummary && <div className="max-h-48 overflow-y-auto whitespace-pre-wrap border-t px-4 py-2 text-sm text-muted-foreground" aria-label="AI work preview">{editPreview}</div>}
       <div className={docMode ? "p-3" : "border-t border-sidebar-border p-3"}>
         <SidebarMenu>
           <SidebarMenuItem>
             <div className="flex flex-col gap-2">
+              {!docMode && editLoading && <AiStatus state="writing" label={docStatus || "Preparing edits"} timer={false} />}
               {!docMode && <div className="flex items-center gap-2 text-sm">
                 <span>Discuss</span>
                 <button type="button" role="switch" aria-label="Edit mode" aria-checked={actionMode} title="Switch mode (Shift+Tab)" onClick={() => setActionMode(!actionMode)} className={`relative h-6 w-11 rounded-full transition-colors ${actionMode ? "bg-primary" : "bg-zinc-400"}`}>
@@ -214,17 +213,14 @@ function GeminiChatPanel({
               </div>}
               {citation && <div className="rounded-md border bg-muted p-2 text-xs"><div className="flex justify-between gap-2"><span className="font-semibold">Selected text</span><button type="button" onClick={() => setCitation("")} aria-label="Remove cited text">Remove</button></div><p className="mt-1 max-h-20 overflow-auto whitespace-pre-wrap">{citation}</p></div>}
 
-              <div className="flex items-center justify-between gap-2"><p className="flex items-center gap-2 break-all text-xs text-muted-foreground"><ModelLogo model={currentModel} />Model: {currentModel}</p>{docMode && <button type="button" aria-label="Switch to chat mode" title="Switch to chat mode" className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => setDocMode(false)}><MessageSquare size={16} /></button>}</div>
-              {isModelCommand && <div ref={modelListRef} id="model-options" role="listbox" className="max-h-48 overflow-y-auto rounded-md border bg-background p-1" aria-label="Available models">
-                {matchingModels.map((model, index) => <button type="button" id={`model-option-${index}`} role="option" aria-selected={index === modelIndex} data-index={index} key={model} onMouseEnter={() => setModelIndex(index)} onClick={() => { currentModelSetter(model); setPrompt(""); }} className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent ${index === modelIndex ? "bg-accent" : ""}`}><ModelLogo model={model} />{model}{model === currentModel ? " ✓" : ""}</button>)}
-              </div>}
+              <div className="flex items-center justify-between gap-2"><div ref={modelPickerRef}><ModelSelector value={currentModel} onChange={currentModelSetter} /></div>{docMode && <button type="button" aria-label="Switch to chat mode" title="Switch to chat mode" className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => setDocMode(false)}><MessageSquare size={16} /></button>}</div>
 
               {docMode ? <PromptBox
                 className="w-full max-w-none"
                 value={prompt}
                 onValueChange={setPrompt}
                 onSubmit={() => {
-                  if (isModelCommand && matchingModels[modelIndex]) { currentModelSetter(matchingModels[modelIndex]); setPrompt(""); }
+                  if (isModelCommand) openModelPicker();
                   else if (!prompt.startsWith("/")) void handleActions();
                 }}
                 disabled={geminiLoading}
@@ -233,14 +229,6 @@ function GeminiChatPanel({
                 placeholder="Describe changes to your document…"
                 inputProps={{
                   "aria-label": "Describe changes to your document",
-                  "aria-controls": isModelCommand ? "model-options" : undefined,
-                  "aria-activedescendant": isModelCommand && matchingModels.length ? `model-option-${modelIndex}` : undefined,
-                  onKeyDown: (e) => {
-                    if (isModelCommand && matchingModels.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
-                      e.preventDefault();
-                      setModelIndex((index) => (index + (e.key === "ArrowDown" ? 1 : -1) + matchingModels.length) % matchingModels.length);
-                    }
-                  },
                 }}
               /> : <div className="mt-2 flex">
                 <Input
@@ -248,19 +236,12 @@ function GeminiChatPanel({
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder={docMode ? "Describe changes to your document…" : "Enter your prompt"}
-                  aria-controls={isModelCommand ? "model-options" : undefined}
-                  aria-activedescendant={isModelCommand && matchingModels.length ? `model-option-${modelIndex}` : undefined}
                   onKeyDown={(e) => {
-                    if (isModelCommand && matchingModels.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
-                      e.preventDefault();
-                      setModelIndex((index) => (index + (e.key === "ArrowDown" ? 1 : -1) + matchingModels.length) % matchingModels.length);
-                    } else if (isModelCommand && e.key === "Enter") {
-                      e.preventDefault();
-                      if (matchingModels[modelIndex]) { currentModelSetter(matchingModels[modelIndex]); setPrompt(""); }
-                    } else if (e.key === "Enter" && !prompt.startsWith("/")) { (docMode || actionMode) ? handleActions() : handleSend(); }
+                    if (isModelCommand && e.key === "Enter") { e.preventDefault(); openModelPicker(); }
+                    else if (e.key === "Enter" && !prompt.startsWith("/")) { (docMode || actionMode) ? handleActions() : handleSend(); }
                   }}
                 />
-                <SendHorizontal onClick={() => { if (!prompt.startsWith("/")) (docMode || actionMode) ? handleActions() : handleSend(); }} className="m-2 cursor-pointer text-xl" />
+                <SendHorizontal onClick={() => { if (isModelCommand) openModelPicker(); else if (!prompt.startsWith("/")) (docMode || actionMode) ? handleActions() : handleSend(); }} className="m-2 cursor-pointer text-xl" />
               </div>}
             </div>
           </SidebarMenuItem>
@@ -272,11 +253,32 @@ function GeminiChatPanel({
 
 export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docMode, setDocMode, citation, setCitation }: GeminiChatBarProps) {
   const { user, loading } = useUser();
-  const { editor, presentation } = useSharedEditor();
+  const { editor, presentation, setReviewPending } = useSharedEditor();
   const auth = getAuth();
   const [prompt, setPrompt] = useState<string>('');
   const [geminiLoading, setGeminiLoading] = useState<boolean>(false);
   const [docStatus, setDocStatus] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+  const [editPreview, setEditPreview] = useState("");
+  const [reviewSummary, setReviewSummary] = useState<string | null>(null);
+  const [reviewInDocument, setReviewInDocument] = useState(false);
+  const reviewResolver = useRef<((accepted: boolean) => void) | null>(null);
+  useEffect(() => () => { reviewResolver.current?.(false); reviewResolver.current = null; }, []);
+  const requestReview = (operations: unknown, inDocument = false) => {
+    const summary = summarizeEdits(operations);
+    setEditLoading(false);
+    setReviewInDocument(inDocument);
+    setReviewSummary(summary);
+    return new Promise<boolean>(resolve => { reviewResolver.current = resolve; });
+  };
+  const finishReview = (accepted: boolean) => {
+    const resolve = reviewResolver.current;
+    reviewResolver.current = null;
+    setReviewSummary(null);
+    setEditPreview("");
+    if (accepted) setEditLoading(true);
+    resolve?.(accepted);
+  };
   const [pendingQuestion, setPendingQuestion] = useState<{ command: string; question: string } | null>(null);
   const [actionMode, setActionMode] = useState<boolean>(false);
   const [currentModel, setCurrentModel] = useState<string>(getDefaultModel);
@@ -299,11 +301,15 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
 
   const handleActions = async () => {
     if (!prompt.trim() || geminiLoading) return;
+    setEditPreview("");
+    const showPreview = (text: string) => setEditPreview(current => current ? `${current}\n\n${text}` : text);
     if (presentation?.current) {
       setGeminiLoading(true);
-      setDocStatus("Editing slides…");
+      setEditLoading(true);
+      setDocStatus("Preparing slide edits");
       try {
-        await presentation.current(prompt, currentModel);
+        const applied = await presentation.current(prompt, currentModel, setDocStatus, showPreview, operations => requestReview(operations));
+        if (!applied) { setDocStatus("Changes discarded."); return; }
         setPrompt(current => current === prompt ? "" : current);
         queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => ({
           ...(old ?? { documentChat: [] }),
@@ -319,12 +325,13 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
         const message = isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "Could not edit slides.";
         setDocStatus(message);
         toast.error(message);
-      } finally { setGeminiLoading(false); }
+      } finally { setGeminiLoading(false); setEditLoading(false); }
       return;
     }
     if (!editor?.commands) { toast.error("Wait for the editor to open."); return; }
     setGeminiLoading(true);
-    setDocStatus("Applying changes…");
+    setEditLoading(true);
+    setDocStatus("Preparing document edits");
 
     const currentPrompt = prompt;
     const withCitation = citation ? `${currentPrompt}\n\nSelected document text for reference:\n${citation}` : currentPrompt;
@@ -348,8 +355,8 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
     }));
 
     try {
-      const res = await apiClient.post(`/document/actions/${documentId}`, { command, modelName: currentModel, content: JSON.parse(contentBeforeRequest) });
-      const { updatedContent, question } = res.data;
+      const result = await requestEdit(documentId, { command, modelName: currentModel, content: JSON.parse(contentBeforeRequest) }, setDocStatus, showPreview);
+      const { updatedContent, question } = result;
       if (question) {
         await saveAction(currentPrompt, question);
         setPendingQuestion({ command, question });
@@ -357,10 +364,40 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
         queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => old && ({ ...old, documentChat: old.documentChat.map((item, index) => index === old.documentChat.length - 1 ? { ...item, response: question } : item) }));
         return;
       }
-      if (JSON.stringify(editor.getJSON()) !== contentBeforeRequest) throw new Error("Document changed while the request was running.");
+      if (editor.isDestroyed || JSON.stringify(editor.getJSON()) !== contentBeforeRequest) throw new Error("Document changed while the request was running.");
+      const previousEditable = editor.isEditable;
+      let accepted = false;
+      let previewSnapshot: string | null = null;
+      setReviewPending(true);
+      try {
+        editor.setEditable(false);
+        const proposed = editor.schema.nodeFromJSON(updatedContent as Parameters<typeof editor.schema.nodeFromJSON>[0]);
+        editor.view.dispatch(editor.state.tr.replaceWith(0, editor.state.doc.content.size, proposed.content).setMeta("addToHistory", false));
+        previewSnapshot = JSON.stringify(editor.getJSON());
+        setDocStatus("Review the changes in your document");
+        accepted = await requestReview(result.operations, true);
+        if (!editor.isDestroyed && JSON.stringify(editor.getJSON()) !== previewSnapshot) {
+          accepted = false;
+          throw new Error("The document changed during review. The newer changes were kept.");
+        }
+      } finally {
+        if (!editor.isDestroyed) {
+          if (!accepted && (previewSnapshot === null || JSON.stringify(editor.getJSON()) === previewSnapshot)) {
+            const original = editor.schema.nodeFromJSON(JSON.parse(contentBeforeRequest));
+            editor.view.dispatch(editor.state.tr.replaceWith(0, editor.state.doc.content.size, original.content).setMeta("addToHistory", false));
+          }
+          editor.setEditable(previousEditable);
+        }
+        setReviewPending(false);
+      }
+      if (!accepted) {
+        setPrompt(currentPrompt);
+        queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => old && ({ ...old, documentChat: old.documentChat.slice(0, -1) }));
+        setDocStatus("Changes discarded.");
+        return;
+      }
       setPendingQuestion(null);
       setDocStatus("Document updated.");
-      editor.commands.setContent(updatedContent, { emitUpdate: true });
       editor.commands.focus();
       await saveAction(currentPrompt, "Applied changes to the document. Save to keep your changes.");
       queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => old && ({ ...old, documentChat: old.documentChat.map((item, index) => index === old.documentChat.length - 1 ? { ...item, response: "Applied changes to the document. Save to keep your changes." } : item) }));
@@ -372,11 +409,12 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
         ...(old ?? { documentChat: [] }),
         documentChat: (old?.documentChat ?? []).slice(0, -1)
       }));
-      console.log(err);
-      setDocStatus("Could not update document. Please try again.");
-      toast.error("Could not update document");
+      const message = err instanceof Error ? err.message : "Could not update document. Please try again.";
+      setDocStatus(message);
+      toast.error(message);
     } finally {
       setGeminiLoading(false);
+      setEditLoading(false);
     }
   };
 
@@ -469,7 +507,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
 
   const panel = (
     <GeminiChatPanel
-      docMode={docMode} setDocMode={setDocMode} citation={citation} setCitation={setCitation} docStatus={docStatus}
+      docMode={docMode} setDocMode={setDocMode} citation={citation} setCitation={setCitation} docStatus={docStatus} editLoading={editLoading} editPreview={editPreview} reviewSummary={reviewSummary} reviewInDocument={reviewInDocument} onReviewDecision={finishReview}
       data={data}
       chatLoading={chatLoading}
       currentModel={currentModel}

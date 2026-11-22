@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { useContext, useState } from "react";
 import apiClient from "@/service/axiosConfig";
 import { useParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/rare-toast";
 
 function ShareFileDialog() {
   const [userToAddMail, setUserToAddMail] = useState('');

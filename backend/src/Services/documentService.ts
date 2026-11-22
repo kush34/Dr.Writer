@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+import { getOpenRouterKey } from "../service/openrouterAuth";
 import { presentationPlan } from "../validation/documentSchemas";
 import { Response } from "express";
 import { documentText, searchExcerpt } from "../utils/documentSearch";
@@ -8,7 +10,7 @@ import Chat from "../Models/chatModel";
 import { MAX_TOKENS_PER_REQUEST } from "../Config/llm";
 // import { getEditOperations, useGeminiStream } from "../service/gemini";
 import { applyEdits } from "../utils/applyEdits";
-import { sanitizeOperations } from "../utils/llmActions";
+import { validateDocumentOperations } from "../utils/llmActions";
 import { AppError, isAppError } from "../utils/appError";
 import { openRouterStream, openRouterComplete, openRouterWithTools } from "../service/openrouter";
 import { getMcpConfig } from "../service/mcpConfig";
@@ -179,7 +181,9 @@ export const performDocumentAction = async (
   command: string,
   currentContent?: { type: "doc"; content: unknown[] },
   modelName?: string,
-  outline?: (string | null)[][]
+  outline?: (string | null)[][],
+  onProgress: (status: string) => void = () => {},
+  onPreview: (text: string) => void = () => {}
 ) => {
   const document = await findDocumentOrThrow(documentId);
 
@@ -187,85 +191,101 @@ export const performDocumentAction = async (
     throw new AppError(403, "Document not found");
   }
 
+  const apiKey = await getOpenRouterKey(userId);
+  const model = modelName || "openai/gpt-4o-mini";
+  const completeValidated = async <T>(prompt: string, validate: (value: any) => T): Promise<T> => {
+    let feedback = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) onProgress("Retrying the model response");
+      const raw = await openRouterComplete(prompt + feedback, model, apiKey);
+      onProgress("Checking the response");
+      try {
+        if (!raw.trim()) throw new Error("The response was empty; provide the requested JSON object.");
+        return validate(extractJsonPayload(raw));
+      } catch (error) {
+        const reason = error instanceof ZodError ? error.issues.map(issue => `${issue.path.join(".")}: ${issue.code}`).join(", ") : error instanceof SyntaxError ? "invalid JSON" : "response failed validation";
+        console.warn("AI edit validation failed:", { model, attempt: attempt + 1, reason });
+        feedback = `\nYour previous response was invalid: ${error instanceof Error ? error.message.slice(0, 1000) : "invalid format"}.\nPrevious response (possibly truncated):\n${raw.slice(0, 24000)}\nReturn a corrected complete JSON response.`;
+      }
+    }
+    throw new AppError(502, "The model could not prepare valid edits after three attempts. Try a different model or simplify your request.");
+  };
   if (document.kind === "presentation") {
     if (!outline) throw new AppError(400, "Open the presentation before requesting edits");
-    const raw = await openRouterComplete(
+    const empty = outline.every(slide => slide.every(shape => !shape?.trim()));
+    let plan = "";
+    if (empty) {
+      onProgress("Planning the presentation");
+      try {
+      const outlinePlan = await completeValidated(
+        `Plan a presentation for this request: ${command}. Return JSON {"audience":"...","goal":"...","slides":[{"title":"...","points":["..."],"visual":"..."}]}. Keep slides concise, use 1 to 12 slides and at most 5 points per slide.`,
+        value => {
+          if (!value || typeof value.audience !== "string" || typeof value.goal !== "string" || !Array.isArray(value.slides) || !value.slides.length || value.slides.length > 12 || value.slides.some((slide: any) => typeof slide.title !== "string" || !slide.title.trim() || !Array.isArray(slide.points) || slide.points.length > 5 || slide.points.some((point: unknown) => typeof point !== "string") || typeof slide.visual !== "string")) throw new Error("Expected audience, goal and 1-12 slides with title, points and visual");
+          return value;
+        });
+      plan = `\nUse this planned outline: ${JSON.stringify(outlinePlan)}`;
+      onPreview(`Presentation outline\n${outlinePlan.slides.map((slide: { title: string; points: string[] }, index: number) => `${index + 1}. ${slide.title}\n${slide.points.map(point => `  • ${point}`).join("\n")}`).join("\n")}`);
+      } catch (error) {
+        if (!isAppError(error) || !error.message.startsWith("The model could not prepare valid edits after three attempts.")) throw error;
+        onProgress("Preparing slides without an outline");
+      }
+    }
+    onProgress("Preparing slide edits");
+    const operations = await completeValidated(
       `Edit a PowerPoint presentation. Return JSON {"operations":[...]}.
 Allowed operations:
 - {"type":"append","title":"...","body":"..."} adds a new slide at the end.
 - {"type":"addText","slide":N,"text":"..."} adds a text box to an existing slide N.
 - {"type":"replace","slide":N,"shape":M,"text":"..."} rewrites existing shape M on existing slide N.
-The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for every new slide.
-The outline lists each slide and its shapes in zero-based order. Null means non-text. Keep unrelated content.
+The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for new slides. Keep slide text concise and preserve unrelated content. Outline lists shapes in zero-based order; null means non-text.
+Return one JSON object with no markdown fences. Example for a new slide: {"operations":[{"type":"append","title":"Overview","body":"First key point\\nSecond key point"}]}. For existing slides use only valid zero-based indexes from the outline. Never target a null shape. Escape line breaks inside JSON strings.
 Outline: ${JSON.stringify(outline)}
-Request: ${command}`, modelName || "openai/gpt-4o-mini");
-    const parsed = presentationPlan.safeParse(extractJsonPayload(raw)?.operations);
-    if (!parsed.success) throw new AppError(502, "Invalid presentation edits from model");
-    const invalid = parsed.data.some(op => op.type !== "append" &&
-      (op.slide >= outline.length || (op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))));
-    if (invalid) throw new AppError(502, "The model returned edits for slides that do not exist. Please try again.");
-    return { operations: parsed.data };
+Request: ${command}${plan}`, value => {
+        const ops = presentationPlan.parse(value?.operations);
+        if (ops.some(op => op.type !== "append" && (op.slide >= outline.length || (op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))))) throw new Error("Slide or shape index is invalid");
+        return ops;
+      });
+    onPreview(`Proposed slide edits\n${operations.map(op => op.type === "append" ? `Add slide: ${op.title}\n${op.body}` : `Slide ${op.slide + 1}: ${op.text}`).join("\n\n")}`);
+    return { operations };
   }
 
   const content = currentContent ?? document.content;
-  const blockCount = Array.isArray(content?.content)
-    ? content.content.length
-    : 0;
-
-  const rawResponse = await openRouterComplete(
-    `You are a TipTap document editor.
-
-Return ONLY valid JSON. No markdown. No prose. No explanation.
-
-The document is TipTap JSON. Edit operations use top-level block indexes, not character offsets.
-
-Allowed response shape:
-{
-  "question": "A concise clarification question, only if needed",
-  "operations": [
-    { "type": "insert", "at": number, "text": string },
-    { "type": "replace", "from": number, "to": number, "text": string },
-    { "type": "delete", "from": number, "to": number }
-  ]
-}
-
-Rules:
-- If the command needs clarification, return a question and no operations.
-- "at", "from", and "to" refer to indexes in the top-level "content" array.
-- Current top-level block count is ${blockCount}.
-- Keep indexes within the existing block range.
-- Use "insert" to add new paragraph text.
-- Use "replace" or "delete" only for whole top-level blocks.
-
-Document:
-${JSON.stringify(content)}
-
-Command:
-${command}`,
-    modelName || "openai/gpt-4o-mini"
-  );
-
-  let llmResponse: { operations?: unknown[]; question?: string };
-  try {
-    llmResponse = extractJsonPayload(rawResponse);
-  } catch (error) {
-    console.error("Invalid OpenRouter edit response:", rawResponse);
-    throw error;
+  const blockCount = Array.isArray(content?.content) ? content.content.length : 0;
+  let documentPlan = "";
+  if (!documentText(content).trim()) {
+    onProgress("Planning the document");
+    try {
+    const planned = await completeValidated(
+      `Plan a document for this request: ${command}. Return JSON {"audience":"...","goal":"...","sections":[{"heading":"...","purpose":"..."}]}. Use 1 to 12 sections.`, value => {
+        if (typeof value?.audience !== "string" || typeof value?.goal !== "string" || !Array.isArray(value?.sections) || !value.sections.length || value.sections.length > 12 || value.sections.some((section: any) => typeof section.heading !== "string" || typeof section.purpose !== "string")) throw new Error("Expected audience, goal and 1-12 sections with heading and purpose");
+        return value;
+      });
+    documentPlan = `\nUse this document outline: ${JSON.stringify(planned)}`;
+    onPreview(`Document outline\n${planned.sections.map((section: { heading: string; purpose: string }, index: number) => `${index + 1}. ${section.heading} — ${section.purpose}`).join("\n")}`);
+    } catch (error) {
+      if (!isAppError(error) || !error.message.startsWith("The model could not prepare valid edits after three attempts.")) throw error;
+      onProgress("Preparing document without an outline");
+    }
   }
-
-  if (typeof llmResponse.question === "string" && llmResponse.question.trim() && !llmResponse.operations?.length) {
-    return { question: llmResponse.question.trim() };
-  }
-
-  const safeOperations = sanitizeOperations(
-    Array.isArray(llmResponse.operations) ? llmResponse.operations as never[] : []
-  );
-
-  if (safeOperations.length === 0) {
-    throw new AppError(400, "LLM returned no valid operations");
-  }
-
-  const updatedContent = applyEdits(content as Parameters<typeof applyEdits>[0], safeOperations);
+  onProgress("Preparing document edits");
+  const llmResponse = await completeValidated(
+    `You are a TipTap document editor. Return only JSON {"question":"...","operations":[...]}.
+Follow the user's request and write the actual content, not instructions for a person to write it. Return exactly one JSON object, with no markdown fences or extra text. Escape line breaks inside strings as \\n.
+Use a question and no operations only if clarification is essential. Otherwise produce operations using original top-level block indexes (current count ${blockCount}):
+{"type":"insert","at":N,"blocks":[...]}, {"type":"replace","from":N,"to":N,"blocks":[...]}, {"type":"delete","from":N,"to":N}.
+Blocks may be {"type":"paragraph","text":"..."}, {"type":"heading","level":1,"text":"..."}, {"type":"bulletList","items":["..."]} or {"type":"orderedList","items":["..."]}. Insert at 0 through ${blockCount}. Replace and delete use inclusive indexes. Do not overlap edits. Keep unrelated blocks and formatting unchanged. For a new document, plan its structure before writing; use appropriate headings and lists. For simple text, an operation may use "text" instead of "blocks".
+Examples (indexes refer to the original document):
+To insert content into an empty document with one blank block: {"operations":[{"type":"replace","from":0,"to":0,"blocks":[{"type":"heading","level":1,"text":"Title"},{"type":"paragraph","text":"A useful opening paragraph."},{"type":"bulletList","items":["First point","Second point"]}]}]}.
+To insert after all existing blocks: {"operations":[{"type":"insert","at":${blockCount},"text":"New paragraph."}]}.
+Use one operation with multiple blocks when adding multiple sections at the same position. A replace range is inclusive. Never use negative indexes, duplicate positions or overlapping ranges. Each insert or replace must contain either blocks or text, not both.
+Document: ${JSON.stringify(content)}
+Command: ${command}${documentPlan}`, value => {
+      if (typeof value?.question === "string" && value.question.trim() && (!value.operations || (Array.isArray(value.operations) && !value.operations.length))) return { question: value.question.trim(), operations: [] };
+      return { operations: validateDocumentOperations(value?.operations, blockCount) };
+    });
+  if (llmResponse.question) return { question: llmResponse.question };
+  const updatedContent = applyEdits(content as Parameters<typeof applyEdits>[0], llmResponse.operations);
+  onPreview(`Proposed document edits\n${llmResponse.operations.map(op => op.type === "delete" ? `Delete blocks ${op.from + 1}–${op.to + 1}` : (op.blocks ? op.blocks.map(block => block.type === "heading" || block.type === "paragraph" ? block.text : block.items.join("\n")).join("\n") : op.text)).join("\n\n")}`);
 
   return {
     updatedContent,
@@ -294,6 +314,8 @@ export const streamUserPrompt = async (
   try {
     await getDocumentData(userId, documentId);
     let tokenCount = 0;
+    const apiKey = await getOpenRouterKey(userId);
+    if (!apiKey) {
     const reservedUser = await User.findOneAndUpdate(
       { _id: userId, token_balance: { $gte: MAX_TOKENS_PER_REQUEST } },
       { $inc: { token_balance: -MAX_TOKENS_PER_REQUEST } },
@@ -305,6 +327,7 @@ export const streamUserPrompt = async (
     }
     reserved = true;
     reservedTokens = MAX_TOKENS_PER_REQUEST;
+    }
     const userConfig = await getMcpConfig(userId);
     const config = { mcpServers: { ...userConfig.mcpServers, drwriter_exa: { url: "https://mcp.exa.ai/mcp", displayName: "Exa web search" } } };
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -332,6 +355,7 @@ export const streamUserPrompt = async (
         }, (tokens) => {
           modelTokens += tokens;
         }, async (tokens) => {
+          if (apiKey) return;
           const additional = modelTokens + tokens - reservedTokens;
           if (additional <= 0) return;
           const user = await User.findOneAndUpdate(
@@ -342,7 +366,7 @@ export const streamUserPrompt = async (
           if (!user) throw new AppError(402, "Insufficient token balance for the next model request.");
           reservedTokens += additional;
         }, (chunk) => res.write(`data: ${JSON.stringify({ chunk })}\n\n`),
-        () => res.write(`data: ${JSON.stringify({ type: "reset" })}\n\n`));
+        () => res.write(`data: ${JSON.stringify({ type: "reset" })}\n\n`), apiKey);
         // Providers that return JSON despite stream=true have not emitted chunks.
         if (!result.streamed) res.write(`data: ${JSON.stringify({ chunk: result.text })}\n\n`);
         await finish(result.text, result.count);
@@ -356,7 +380,8 @@ export const streamUserPrompt = async (
       (text) => {
         res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
       },
-      finish
+      finish,
+      apiKey
     );
   } catch (error) {
     console.error("OpenRouter stream error:", error);
