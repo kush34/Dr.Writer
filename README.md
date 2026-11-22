@@ -42,6 +42,32 @@ This project is a fully functional word document editor, designed to provide an 
 
 ## Installtion
 
+### Run locally with Docker (no credentials needed)
+
+Requires Docker and Node.js. This starts MongoDB, a local Firebase Auth emulator and the backend.
+
+```
+docker compose up --build -d
+```
+
+Then start the frontend:
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173 and click **Create an Account** (email + password; Google sign-in does not work against the emulator).
+
+Credentials live in `backend/.env` and `frontend/.env` (both git-ignored). The defaults are local-only:
+MongoDB runs in a container, and Firebase Auth runs in the emulator on port 9099.
+
+Not available without real keys: image upload (Cloudinary) and AI features (OpenRouter).
+Leave `CLOUDINARY_*` / `OPEN_ROUTER_API_KEY` empty to keep them disabled, or fill them in to enable.
+
+### Run without Docker
+
 # Prerequisites
 
 Ensure you have the following installed on your system:

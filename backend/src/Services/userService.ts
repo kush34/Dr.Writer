@@ -2,6 +2,7 @@ import { DecodedIdToken } from "firebase-admin/auth";
 import admin from "../Config/firebaseConfig";
 import User from "../Models/userModel";
 import { AppError } from "../utils/appError";
+import { USER_TOKEN_ALLOWANCE } from "../Config/llm";
 
 const ensureUserRecord = async (decodedToken: DecodedIdToken) => {
   const email = decodedToken.email;
@@ -15,6 +16,15 @@ const ensureUserRecord = async (decodedToken: DecodedIdToken) => {
       name: decodedToken.name,
       email,
     });
+  } else {
+    // Increase old allowances once while preserving each account's usage.
+    await User.updateOne(
+      { _id: user._id, $or: [{ token_allowance_version: { $exists: false } }, { token_allowance_version: { $lt: 3 } }] },
+      [{ $set: {
+        token_balance: { $min: [USER_TOKEN_ALLOWANCE, { $add: [{ $ifNull: ["$token_balance", 0] }, { $subtract: [USER_TOKEN_ALLOWANCE, { $cond: [{ $eq: [{ $ifNull: ["$token_allowance_version", 1] }, 1] }, 10_000, 50_000] }] }] }] },
+        token_allowance_version: 3,
+      } }]
+    );
   }
 
   return user;

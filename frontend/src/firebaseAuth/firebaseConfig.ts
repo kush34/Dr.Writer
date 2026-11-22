@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, User } from "firebase/auth";
+import { getAuth, connectAuthEmulator, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, User } from "firebase/auth";
 import { FirebaseError } from "firebase/app";
 import axios from "axios";
 
@@ -18,6 +18,10 @@ const provider = new GoogleAuthProvider();
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+if (import.meta.env.VITE_AuthEmulator) {
+  connectAuthEmulator(auth, import.meta.env.VITE_AuthEmulator, { disableWarnings: true });
+}
 
 const normalizeError = (error: unknown) => {
   if (error instanceof FirebaseError) {

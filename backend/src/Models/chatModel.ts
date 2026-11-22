@@ -12,6 +12,7 @@ const chatSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    toolCount: { type: Number, default: 0 },
     documentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Document", // Match your actual model name
