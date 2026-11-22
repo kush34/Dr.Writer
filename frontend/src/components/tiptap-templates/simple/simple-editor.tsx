@@ -80,6 +80,10 @@ import { useUser } from "@/context/UserContext"
 import socket from "@/service/socket"
 import { Plus, Save, SaveAll, SaveIcon, Share, Share2, Share2Icon, Undo2 } from "lucide-react"
 import ShareFileDialog from "@/components/ShareFileDialoag"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Download } from "lucide-react"
+import { toast } from "sonner"
+import { createDocx } from "./export-docx"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -255,6 +259,47 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
     content,
   })
 
+  const exportDocument = async (format: "pdf" | "docx") => {
+    if (!editor) return
+    const documentTitle = localTitle.trim() || "Untitled document"
+    const container = document.createElement("div")
+    container.innerHTML = editor.getHTML()
+
+    try {
+      if (format === "docx") {
+        const file = await createDocx(editor.getJSON())
+        const url = URL.createObjectURL(file)
+        const link = document.createElement("a")
+        link.href = url
+        link.download = `${documentTitle.replace(/[\\/:*?"<>|]/g, "_")}.docx`
+        link.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      } else {
+        const frame = document.createElement("iframe")
+        frame.style.cssText = "position:fixed;width:0;height:0;border:0"
+        document.body.appendChild(frame)
+        const printDocument = frame.contentDocument
+        if (!printDocument || !frame.contentWindow) {
+          frame.remove()
+          throw new Error("Could not open print preview")
+        }
+        printDocument.open()
+        printDocument.write('<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;line-height:1.5;margin:2cm}img{max-width:100%;height:auto}pre{white-space:pre-wrap}blockquote{border-left:3px solid #ccc;padding-left:1em}</style></head><body></body></html>')
+        printDocument.close()
+        printDocument.title = documentTitle
+        printDocument.body.appendChild(container)
+        await Promise.all(Array.from(printDocument.images).map((image) => image.decode().catch(() => {})))
+        frame.contentWindow.onafterprint = () => frame.remove()
+        frame.contentWindow.focus()
+        frame.contentWindow.print()
+      }
+    } catch (error) {
+      console.error("Document export failed:", error)
+      const detail = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Could not export ${format.toUpperCase()}: ${detail}`)
+    }
+  }
+
   const rect = useCursorVisibility({
     editor,
     overlayHeight: toolbarRef.current?.getBoundingClientRect().height ?? 0,
@@ -300,6 +345,15 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
           onChange={(e) => setLocalTitle(e.target.value)}
         />
         <ShareFileDialog />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button aria-label="Export document" disabled={!editor}><Download /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => void exportDocument("pdf")}>Export as PDF</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void exportDocument("docx")}>Export as DOCX</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           onClick={() => {
             if (!editor) return;
