@@ -6,7 +6,7 @@ import { EyeOff } from 'lucide-react';
 import { Description } from '@radix-ui/react-dialog';
 import { Input } from './ui/input';
 import Loader from './loaders/Loader';
-import { toast } from "sonner"
+import { toast } from "@/components/ui/rare-toast"
 const Login = ({ setFlag }: { setFlag: React.Dispatch<React.SetStateAction<boolean>> }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

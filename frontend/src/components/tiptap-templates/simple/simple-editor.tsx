@@ -82,10 +82,11 @@ import { Plus, Save, SaveAll, SaveIcon, Share, Share2, Share2Icon, Undo2 } from 
 import ShareFileDialog from "@/components/ShareFileDialoag"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Download } from "lucide-react"
-import { toast } from "sonner"
+import { toast } from "@/components/ui/rare-toast"
 import { createDocx } from "./export-docx"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { setAutosave, useAutosave } from "@/config/autosave"
+import { useSharedEditor } from "@/context/EditorContext"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -214,6 +215,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   )
   const [localTitle, setLocalTitle] = useState(title);
   const autosave = useAutosave()
+  const { reviewPending, reviewPendingRef } = useSharedEditor()
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -277,7 +279,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   const blocker = useBlocker(dirty || saving)
 
   const save = async (automatic: boolean) => {
-    if (!editor || savingRef.current || !snapshot) return
+    if (!editor || savingRef.current || reviewPendingRef.current || !snapshot) return
     const currentContent = editor.getJSON()
     const currentTitle = localTitle
     savingRef.current = true
@@ -295,10 +297,10 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   }
 
   useEffect(() => {
-    if (!autosave || !dirty || saving || snapshot === attemptedSnapshot.current) return
+    if (!autosave || !dirty || saving || reviewPending || snapshot === attemptedSnapshot.current) return
     const timer = window.setTimeout(() => void save(true), 1000)
     return () => window.clearTimeout(timer)
-  }, [autosave, dirty, saving, snapshot, revision])
+  }, [autosave, dirty, saving, snapshot, revision, reviewPending])
 
   useEffect(() => {
     if (!dirty && !saving) return
@@ -392,6 +394,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
       <div className="m-2 flex min-w-0 items-center gap-2">
         <input
           aria-label="Document title"
+          disabled={reviewPending}
           className="min-w-0 flex-1 rounded bg-transparent px-2 text-xl font-bold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
           value={localTitle}
           onChange={(e) => setLocalTitle(e.target.value)}
@@ -400,11 +403,11 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
           <input type="checkbox" checked={autosave} onChange={(event) => { attemptedSnapshot.current = null; setAutosave(event.target.checked) }} />
           Autosave
         </label>
-        <span role="status" className="shrink-0 text-xs text-muted-foreground">{saving ? "Saving…" : dirty ? "Unsaved" : "Saved"}</span>
+        <span role="status" className="shrink-0 text-xs text-muted-foreground">{reviewPending ? "Reviewing changes" : saving ? "Saving…" : dirty ? "Unsaved" : "Saved"}</span>
         <ShareFileDialog />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button aria-label="Export document" disabled={!editor}><Download /></Button>
+            <Button aria-label="Export document" disabled={!editor || reviewPending}><Download /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={() => void exportDocument("pdf")}>Export as PDF</DropdownMenuItem>
@@ -412,7 +415,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
           </DropdownMenuContent>
         </DropdownMenu>
         <Button
-          aria-label="Save document" disabled={!editor || saving}
+          aria-label="Save document" disabled={!editor || saving || reviewPending}
           onClick={() => void save(false)}>
           <SaveAll />
         </Button>
@@ -433,6 +436,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
         </DialogContent>
       </Dialog>
       <EditorContext.Provider value={{ editor }}>
+        <fieldset disabled={reviewPending} className="contents" aria-label="Editing tools">
         <Toolbar
           ref={toolbarRef}
           style={{
@@ -456,6 +460,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
             />
           )}
         </Toolbar>
+        </fieldset>
         <EditorContent
           editor={editor}
           role="presentation"

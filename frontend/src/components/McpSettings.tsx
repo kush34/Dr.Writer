@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import apiClient from "@/service/axiosConfig";
 import axios from "axios";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/rare-toast";
 
 const example = '{\n  "url": "https://example.com/mcp",\n  "headers": {\n    "Authorization": "Bearer YOUR_API_KEY"\n  }\n}';
 

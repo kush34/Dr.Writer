@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createDocument, uploadDocument } from "@/service/document";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/rare-toast";
 import { Plus } from "lucide-react";
 
 const Home = () => {

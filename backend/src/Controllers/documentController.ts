@@ -21,7 +21,7 @@ import {
   saveActionHistory,
   updateDocument,
 } from "../Services/documentService";
-import { AppError } from "../utils/appError";
+import { AppError, isAppError } from "../utils/appError";
 import { handleControllerError } from "../utils/controllerErrorHandler";
 import {
   addUserSchema,
@@ -133,10 +133,22 @@ const performDocumentActionHandler = async (req: Request, res: Response) => {
     const userId = requireAuthenticatedUser(req);
     const { documentId } = documentActionParamsSchema.parse(req.params);
     const { command, content, modelName, outline } = documentActionBodySchema.parse(req.body);
-    const result = await performDocumentAction(userId, documentId, command, content, modelName, outline);
-    res.status(200).json(result);
+    const stream = req.get("accept")?.includes("text/event-stream") === true;
+    if (stream) {
+      res.set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
+      res.flushHeaders();
+    }
+    const result = await performDocumentAction(userId, documentId, command, content, modelName, outline,
+      stream ? status => res.write(`data: ${JSON.stringify({ type: "progress", status })}\n\n`) : undefined,
+      stream ? text => res.write(`data: ${JSON.stringify({ type: "preview", text })}\n\n`) : undefined);
+    if (stream) { res.write(`data: ${JSON.stringify({ type: "result", result })}\n\n`); res.end(); }
+    else res.status(200).json(result);
   } catch (error) {
-    handleControllerError(res, error);
+    if (res.headersSent) {
+      if (!isAppError(error)) console.error("Unexpected document edit error:", error);
+      const message = isAppError(error) ? error.message : "Could not prepare edits. Please try again.";
+      res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`); res.end();
+    } else handleControllerError(res, error);
   }
 };
 

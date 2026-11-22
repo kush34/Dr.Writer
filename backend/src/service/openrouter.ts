@@ -254,5 +254,8 @@ export const openRouterComplete = async (
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.filter(part => part?.type === "text" && typeof part.text === "string").map(part => part.text).join("");
+  return "";
 };

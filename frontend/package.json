@@ -49,6 +49,7 @@
     "clsx": "^2.1.1",
     "docx": "^9.16.0",
     "dotenv": "^16.4.7",
+    "figma-squircle": "^1.1.0",
     "firebase": "^11.1.0",
     "lodash.throttle": "^4.1.1",
     "lucide-react": "^0.469.0",
