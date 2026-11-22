@@ -30,7 +30,12 @@ export const addDocument = async (doc) => {
   const db = await openDatabase();
   const transaction = db.transaction("documents", "readwrite");
   const store = transaction.objectStore("documents");
-  store.add(doc);
+  await new Promise((resolve, reject) => {
+    store.put(doc);
+    transaction.oncomplete = () => resolve(undefined);
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
 
 };
 
@@ -57,7 +62,12 @@ export const deleteDocument = async (id) => {
   const db = await openDatabase();
   const transaction = db.transaction("documents", "readwrite");
   const store = transaction.objectStore("documents");
-  store.delete(id);
+  await new Promise((resolve, reject) => {
+    store.delete(id);
+    transaction.oncomplete = () => resolve(undefined);
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
 };
 
 
@@ -76,7 +86,7 @@ export const syncData = async (id)=>{
   })
   console.log(response);
   if(response.status == 200){
-    deleteDocument(id)
+    await deleteDocument(id)
     return true;
   }
   else{

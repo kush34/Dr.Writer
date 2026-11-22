@@ -5,6 +5,7 @@ import { GeminiChatBar } from "@/components/GeminiChatBar";
 import { useParams } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSidebarSide } from "@/config/sidebar-side";
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import "./printer.css";
 
 const DEFAULT_DESKTOP_SPLIT = 50;
@@ -20,6 +21,7 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_DESKTOP_SPLIT);
   const [isDragging, setIsDragging] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
 
   useEffect(() => {
     const savedWidth = window.localStorage.getItem(SPLIT_STORAGE_KEY);
@@ -98,13 +100,15 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
       className={`relative flex h-screen w-full overflow-hidden ${side === "right" ? "flex-row-reverse" : ""}`}
     >
       <div
-        className="relative flex h-full min-h-0 shrink-0"
+        id="editor-chat-panel"
+        hidden={!chatOpen}
+        className="relative h-full min-h-0 shrink-0"
         style={{ width: `${sidebarWidth}%`, minWidth: `${MIN_PANEL_WIDTH}px` }}
       >
         <GeminiChatBar documentId={id} mode="desktop" />
       </div>
 
-      <button
+      {chatOpen && <button
         type="button"
         role="separator"
         aria-orientation="vertical"
@@ -119,10 +123,21 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
         className="relative z-30 w-3 shrink-0 cursor-col-resize border-x border-border/60 bg-background/70 transition-colors hover:bg-accent/50"
       >
         <span className="m-auto block h-14 w-1 rounded-full bg-border" />
-      </button>
+      </button>}
 
       <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
-        <div className="flex h-full min-h-0 w-full min-w-0 justify-center overflow-hidden px-4 py-4 md:px-6">
+        <button
+          type="button"
+          aria-label={chatOpen ? "Collapse chat sidebar" : "Expand chat sidebar"}
+          aria-expanded={chatOpen}
+          aria-controls="editor-chat-panel"
+          title={chatOpen ? "Collapse chat sidebar" : "Expand chat sidebar"}
+          onClick={() => setChatOpen((open) => !open)}
+          className={`absolute top-5 z-20 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${side === "right" ? "right-1" : "left-1"}`}
+        >
+          {side === "left" ? (chatOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />) : (chatOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />)}
+        </button>
+        <div className={`flex h-full min-h-0 w-full min-w-0 justify-center overflow-hidden px-4 py-4 md:px-6 ${side === "right" ? "pr-12 md:pr-12" : "pl-12 md:pl-12"}`}>
           {children}
         </div>
       </main>

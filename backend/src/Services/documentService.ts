@@ -348,7 +348,7 @@ export const syncDocument = async (
   if (title !== document.title || newContent !== document.content) {
     await Document.findByIdAndUpdate(
       fileId,
-      { title, content: JSON.stringify(newContent), editedAt: new Date() },
+      { title, content: newContent, editedAt: new Date() },
       { new: true }
     );
   }

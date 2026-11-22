@@ -75,11 +75,17 @@ import { uploadDocumentImage } from "@/service/document"
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
 import content from "@/components/tiptap-templates/simple/data/content.json"
-import { useNavigate, useParams } from "react-router-dom"
+import { useBlocker, useNavigate, useParams } from "react-router-dom"
 import { useUser } from "@/context/UserContext"
 import socket from "@/service/socket"
 import { Plus, Save, SaveAll, SaveIcon, Share, Share2, Share2Icon, Undo2 } from "lucide-react"
 import ShareFileDialog from "@/components/ShareFileDialoag"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Download } from "lucide-react"
+import { toast } from "sonner"
+import { createDocx } from "./export-docx"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { setAutosave, useAutosave } from "@/config/autosave"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -193,7 +199,7 @@ type SimpleEditorProps = {
   content: JSONContent;
   title: string;
   onEditorReady?: (editor: Editor) => void;
-  updateDocument: (editor: Editor, title: string) => void;
+  updateDocument: (content: JSONContent, title: string, automatic: boolean) => Promise<void>;
 };
 
 
@@ -207,6 +213,14 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
     "main"
   )
   const [localTitle, setLocalTitle] = useState(title);
+  const autosave = useAutosave()
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const attemptedSnapshot = useRef<string | null>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const initializedEditor = useRef<Editor | null>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
@@ -253,7 +267,89 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
       }),
     ],
     content,
+    onTransaction: ({ transaction }) => {
+      if (transaction.docChanged) setRevision((value) => value + 1)
+    },
   })
+
+  const snapshot = editor ? JSON.stringify({ title: localTitle, content: editor.getJSON() }) : null
+  const dirty = savedSnapshot !== null && snapshot !== savedSnapshot
+  const blocker = useBlocker(dirty || saving)
+
+  const save = async (automatic: boolean) => {
+    if (!editor || savingRef.current || !snapshot) return
+    const currentContent = editor.getJSON()
+    const currentTitle = localTitle
+    savingRef.current = true
+    setSaving(true)
+    attemptedSnapshot.current = snapshot
+    try {
+      await updateDocument(currentContent, currentTitle, automatic)
+      setSavedSnapshot(snapshot)
+    } catch {
+      // The save handler reports the failure; keep the document dirty.
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!autosave || !dirty || saving || snapshot === attemptedSnapshot.current) return
+    const timer = window.setTimeout(() => void save(true), 1000)
+    return () => window.clearTimeout(timer)
+  }, [autosave, dirty, saving, snapshot, revision])
+
+  useEffect(() => {
+    if (!dirty && !saving) return
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ""
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [dirty, saving])
+
+  const exportDocument = async (format: "pdf" | "docx") => {
+    if (!editor) return
+    const documentTitle = localTitle.trim() || "Untitled document"
+    const container = document.createElement("div")
+    container.innerHTML = editor.getHTML()
+
+    try {
+      if (format === "docx") {
+        const file = await createDocx(editor.getJSON())
+        const url = URL.createObjectURL(file)
+        const link = document.createElement("a")
+        link.href = url
+        link.download = `${documentTitle.replace(/[\\/:*?"<>|]/g, "_")}.docx`
+        link.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      } else {
+        const frame = document.createElement("iframe")
+        frame.style.cssText = "position:fixed;width:0;height:0;border:0"
+        document.body.appendChild(frame)
+        const printDocument = frame.contentDocument
+        if (!printDocument || !frame.contentWindow) {
+          frame.remove()
+          throw new Error("Could not open print preview")
+        }
+        printDocument.open()
+        printDocument.write('<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;line-height:1.5;margin:2cm}img{max-width:100%;height:auto}pre{white-space:pre-wrap}blockquote{border-left:3px solid #ccc;padding-left:1em}</style></head><body></body></html>')
+        printDocument.close()
+        printDocument.title = documentTitle
+        printDocument.body.appendChild(container)
+        await Promise.all(Array.from(printDocument.images).map((image) => image.decode().catch(() => {})))
+        frame.contentWindow.onafterprint = () => frame.remove()
+        frame.contentWindow.focus()
+        frame.contentWindow.print()
+      }
+    } catch (error) {
+      console.error("Document export failed:", error)
+      const detail = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Could not export ${format.toUpperCase()}: ${detail}`)
+    }
+  }
 
   const rect = useCursorVisibility({
     editor,
@@ -271,9 +367,10 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
     }
   }, [editor]);
   useEffect(() => {
-    if (!editor || !content) return;
-    editor.commands.setContent(content);
-  }, [editor, content])
+    if (!editor || initializedEditor.current === editor) return;
+    initializedEditor.current = editor;
+    setSavedSnapshot(JSON.stringify({ title, content: editor.getJSON() }));
+  }, [editor, title])
 
   useEffect(() => {
     if (!editor || !user || !id) return;
@@ -299,20 +396,42 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
           value={localTitle}
           onChange={(e) => setLocalTitle(e.target.value)}
         />
+        <label className="flex shrink-0 items-center gap-1 text-sm text-foreground">
+          <input type="checkbox" checked={autosave} onChange={(event) => { attemptedSnapshot.current = null; setAutosave(event.target.checked) }} />
+          Autosave
+        </label>
+        <span role="status" className="shrink-0 text-xs text-muted-foreground">{saving ? "Saving…" : dirty ? "Unsaved" : "Saved"}</span>
         <ShareFileDialog />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button aria-label="Export document" disabled={!editor}><Download /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => void exportDocument("pdf")}>Export as PDF</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void exportDocument("docx")}>Export as DOCX</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
-          onClick={() => {
-            if (!editor) return;
-            console.log('Saved fired')
-            updateDocument(editor,localTitle)
-          }
-          }>
+          aria-label="Save document" disabled={!editor || saving}
+          onClick={() => void save(false)}>
           <SaveAll />
         </Button>
-        <Button onClick={() => navigate("/home")}>
+        <Button aria-label="Back to documents" onClick={() => navigate("/home")}>
           <Undo2 />
         </Button>
       </div>
+      <Dialog open={blocker.state === "blocked"} onOpenChange={(open) => { if (!open && blocker.state === "blocked") blocker.reset() }}>
+        <DialogContent onOpenAutoFocus={(event) => { event.preventDefault(); cancelRef.current?.focus() }}>
+          <DialogHeader>
+            <DialogTitle>Discard unsaved changes?</DialogTitle>
+            <DialogDescription>Your document has unsaved changes. Discard them and leave?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button ref={cancelRef} type="button" className="rounded-md border px-4 py-2" onClick={() => blocker.reset?.()}>Cancel</button>
+            <button type="button" className="rounded-md bg-destructive px-4 py-2 text-white disabled:opacity-50" disabled={saving} onClick={() => blocker.proceed?.()}>Discard and go back</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <EditorContext.Provider value={{ editor }}>
         <Toolbar
           ref={toolbarRef}
