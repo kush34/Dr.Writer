@@ -10,7 +10,7 @@ import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { DocumentDTO } from "@/types";
-import { useState } from "react";
+import { EditorSkeleton } from "@/components/PageSkeleton";
 
 const normalizeContent = (content: any): JSONContent => {
   if (typeof content === "object" && content?.type === "doc") return content;
@@ -47,13 +47,23 @@ const Editor = ({ onEditorReady }: EditorProps) => {
 
   const updateMutation = useMutation({
     mutationFn: updateDocumentApi,
-    onSuccess: () => {
-      toast.success("Saved", { description: "Changes saved" });
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["documents"] });
+      queryClient.setQueryData(["documents"], (old: any) => old && ({ ...old, documents: old.documents.map((item: any) => item._id === variables.id ? { ...item, title: variables.title, editedAt: new Date().toISOString() } : item) }));
+      return { toastId: toast.loading("Saving document…") };
+    },
+    onSuccess: (_result, _variables, context) => {
+      toast.success("Document saved", { id: context?.toastId });
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
-    onError: async (_, variables) => {
-      await addDocument({ _id: variables.id, title: variables.title, newContent: variables.content });
-      toast.success("Saved", { description: "Saved offline" });
+    onError: async (_, variables, context) => {
+      try {
+        await addDocument({ _id: variables.id, title: variables.title, newContent: variables.content });
+        toast.warning("Saved offline", { id: context?.toastId, description: "Changes will sync when you reconnect." });
+      } catch {
+        toast.error("Could not save document", { id: context?.toastId });
+        queryClient.invalidateQueries({ queryKey: ["documents"] });
+      }
     },
   });
 
@@ -62,7 +72,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
     updateMutation.mutate({ id, title: title, content: editor.getJSON() });
   };
 
-  if (userLoading || isLoading) return <div className="h-screen flex items-center justify-center text-lg">Syncing document…</div>;
+  if (userLoading || isLoading) return <EditorSkeleton />;
   if (!user) return <p>User not logged in</p>;
   if (error) return <p>Failed to load document</p>;
   if (!data) return <p>No document data</p>;

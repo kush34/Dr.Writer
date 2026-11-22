@@ -52,7 +52,7 @@ const Register = ({ setFlag }: { setFlag: React.Dispatch<React.SetStateAction<bo
           <Input
             id="Email"
             disabled={isLoading}
-            className="px-5 py-3 outline-none rounded-md w-full"
+            className="px-5 py-3 outline-none rounded-md w-full border-slate-400 placeholder:text-slate-600"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Enter Mail Address"
@@ -66,7 +66,7 @@ const Register = ({ setFlag }: { setFlag: React.Dispatch<React.SetStateAction<bo
           <Input
             id="Password"
             disabled={isLoading}
-            className="px-5 py-3 outline-none rounded-md w-full"
+            className="px-5 py-3 outline-none rounded-md w-full border-slate-400 placeholder:text-slate-600"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Choose Password"
@@ -84,7 +84,7 @@ const Register = ({ setFlag }: { setFlag: React.Dispatch<React.SetStateAction<bo
         }
       </div>
       <div className="google-login and register ac flex gap-2 justify-center">
-        Already Have an Account?  <button onClick={() => setFlag(prev => !prev)} className='text-[#3ce368] font underline'>Sign in to Account</button>
+        Already Have an Account?  <button onClick={() => setFlag(prev => !prev)} className='text-green-800 font underline'>Sign in to Account</button>
       </div>
     </div>
   )

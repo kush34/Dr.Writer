@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { GeminiChatBar } from "@/components/GeminiChatBar";
 import { useParams } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSidebarSide } from "@/config/sidebar-side";
 import "./printer.css";
 
 const DEFAULT_DESKTOP_SPLIT = 50;
@@ -15,6 +16,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 const EditorPageLayout = ({ children }: { children: ReactNode }) => {
   const { id } = useParams();
   const isMobile = useIsMobile();
+  const side = useSidebarSide();
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_DESKTOP_SPLIT);
   const [isDragging, setIsDragging] = useState(false);
@@ -44,7 +46,7 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
       const bounds = layout.getBoundingClientRect();
       const minPercent = (MIN_PANEL_WIDTH / bounds.width) * 100;
       const maxPercent = 100 - minPercent;
-      const nextWidth = ((clientX - bounds.left) / bounds.width) * 100;
+      const nextWidth = (side === "left" ? clientX - bounds.left : bounds.right - clientX) / bounds.width * 100;
 
       setSidebarWidth(clamp(nextWidth, minPercent, maxPercent));
     };
@@ -69,7 +71,7 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [isDragging, isMobile]);
+  }, [isDragging, isMobile, side]);
 
   if (!id) return null;
 
@@ -77,9 +79,9 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
     return (
       <SidebarProvider defaultOpen className="relative h-screen">
         <div className="relative flex h-screen w-full overflow-hidden">
-          <GeminiChatBar documentId={id} mode="mobile" />
+          <GeminiChatBar documentId={id} mode="mobile" side={side} />
           <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
-            <SidebarTrigger className="absolute left-4 top-4 z-20 md:hidden" />
+            <SidebarTrigger className={`absolute ${side === "right" ? "right-4" : "left-4"} top-4 z-20 md:hidden`} />
             <div className="flex h-full min-h-0 w-full min-w-0 justify-center px-3 pb-3 pt-16">
               {children}
             </div>
@@ -93,7 +95,7 @@ const EditorPageLayout = ({ children }: { children: ReactNode }) => {
   return (
     <div
       ref={layoutRef}
-      className="relative flex h-screen w-full overflow-hidden"
+      className={`relative flex h-screen w-full overflow-hidden ${side === "right" ? "flex-row-reverse" : ""}`}
     >
       <div
         className="relative flex h-full min-h-0 shrink-0"

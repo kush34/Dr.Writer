@@ -22,23 +22,24 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 import { useUser } from "@/context/UserContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuPortal, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
 import { getUserInfo } from "@/service/document";
+import { openCommandSearch } from "./CommandSearch";
 import { MAX_TOKENS } from "@/config/llm";
-import { useState } from "react";
-import { McpSettings } from "./McpSettings";
+
 
 // Menu items.
 const items = [
   {
     title: "Home",
-    url: "#",
+    url: "/home",
     icon: Home,
   },
   {
@@ -63,9 +64,9 @@ const items = [
   },
 ];
 
-export function AppSidebar() {
-  const [settingsOpen, setSettingsOpen] = useState(false);
+export function AppSidebar({ side = "left" }: { side?: "left" | "right" }) {
   const { theme } = useTheme();
+  const { setOpenMobile } = useSidebar();
   const { user, loading } = useUser();
   const { data, isLoading, error } = useQuery({
     queryKey: ["user"],
@@ -92,7 +93,7 @@ export function AppSidebar() {
   if (!user) return <p>User not logged in</p>;
 
   return (
-    <Sidebar>
+    <Sidebar side={side}>
       <SidebarContent className={`border-none!`}>
         <SidebarGroup>
           <SidebarGroupLabel className="my-5 text-xl">Dr. Writer</SidebarGroupLabel>
@@ -100,7 +101,9 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  {item.title === "Settings" ? <SidebarMenuButton onClick={() => setSettingsOpen(true)}><item.icon /><span>Settings</span></SidebarMenuButton> : <SidebarMenuButton asChild>
+                  {item.title === "Search" ? <SidebarMenuButton onClick={() => { setOpenMobile(false); openCommandSearch(); }}><item.icon /><span>Search</span><span className="ml-auto text-xs text-muted-foreground">Ctrl K</span></SidebarMenuButton> : item.title === "Settings" ? <SidebarMenuButton onClick={() => navigate("/settings")}><item.icon /><span>Settings</span></SidebarMenuButton> : item.title === "Home" ? <SidebarMenuButton asChild>
+                    <Link to={item.url}><item.icon /><span>{item.title}</span></Link>
+                  </SidebarMenuButton> : <SidebarMenuButton asChild>
                     <a href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -112,6 +115,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarGroupContent className="px-2 pb-2">
+        <ModeToggle />
+      </SidebarGroupContent>
       <SidebarGroupContent className="p-2 space-y-1">
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>Tokens</span>
@@ -130,9 +136,6 @@ export function AppSidebar() {
 
       <SidebarFooter className={`!border-none overflow-visible`}>
         <SidebarContent className="!p-2 !bg-transparent">
-          <SidebarGroupContent className="p-0">
-            <ModeToggle />
-          </SidebarGroupContent>
           <SidebarGroupContent className="p-0 flex items-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -164,7 +167,7 @@ export function AppSidebar() {
                     Billing
                     <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                  <DropdownMenuItem onSelect={() => navigate("/settings")}>
                     Settings
                     <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
                   </DropdownMenuItem>
@@ -206,7 +209,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarContent>
       </SidebarFooter>
-      <McpSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Sidebar>
   );
 }

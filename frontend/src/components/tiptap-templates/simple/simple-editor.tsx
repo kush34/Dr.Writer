@@ -292,9 +292,10 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   }, [editor, user, id]);
   return (
     <div className="simple-editor-wrapper flex flex-col justify-center">
-      <div className="m-2 flex gap-3">
+      <div className="m-2 flex min-w-0 items-center gap-2">
         <input
-          className="px-2 rounded font-bold text-white text-xl mr-5"
+          aria-label="Document title"
+          className="min-w-0 flex-1 rounded bg-transparent px-2 text-xl font-bold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
           value={localTitle}
           onChange={(e) => setLocalTitle(e.target.value)}
         />

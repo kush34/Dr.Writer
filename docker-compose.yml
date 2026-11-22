@@ -17,6 +17,10 @@ services:
       dockerfile: auth-emulator.Dockerfile
     ports:
       - "9099:9099"
+    volumes:
+      - auth_data:/data
+    command: ["firebase", "emulators:start", "--only", "auth", "--project", "demo-drwriter", "--import", "/data/export", "--export-on-exit", "/data/export"]
+    stop_grace_period: 30s
     healthcheck:
       test:
         [
@@ -45,4 +49,5 @@ services:
 
 volumes:
   mongo_data:
+  auth_data:
   uploads:

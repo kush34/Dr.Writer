@@ -1,4 +1,5 @@
 import { Response } from "express";
+import { documentText, searchExcerpt } from "../utils/documentSearch";
 import cloudinary from "../Config/cloudinary";
 import User from "../Models/userModel";
 import Document from "../Models/documentModel";
@@ -80,9 +81,34 @@ export const createDocument = async (userId: string, title: string) => {
 };
 
 export const getDocumentList = async (userId: string) => {
-  return Document.find({ user_id: userId }).select(
-    "title createdAt uploadStatus uploadError sourceFileName"
-  );
+  const documents = await Document.find({ user_id: userId }).select(
+    "title content createdAt editedAt uploadStatus uploadError sourceFileName"
+  ).lean();
+  const previewText = (content: unknown): string => {
+    if (typeof content === "string") return content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+    const words: string[] = [];
+    const visit = (node: any) => {
+      if (!node || words.join(" ").length >= 300) return;
+      if (typeof node.text === "string") words.push(node.text);
+      if (Array.isArray(node.content)) node.content.forEach(visit);
+    };
+    visit(content);
+    return words.join(" ").slice(0, 300);
+  };
+  return documents.map(({ content, ...document }) => ({ ...document, preview: previewText(content) }));
+};
+
+export const searchDocuments = async (userId: string, query: string) => {
+  const results: { _id: string; title: string; excerpt: string }[] = [];
+  const cursor = Document.find({ $or: [{ user_id: userId }, { users: userId }] }).select("title content").lean().cursor();
+  for await (const document of cursor) {
+    const excerpt = searchExcerpt(documentText(document.content), query);
+    if (excerpt !== null || document.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())) {
+      results.push({ _id: document._id.toString(), title: document.title, excerpt: excerpt ?? "Title match" });
+      if (results.length === 30) break;
+    }
+  }
+  return results;
 };
 
 export const getDocumentData = async (userId: string, fileId: string) => {
@@ -105,7 +131,7 @@ export const updateDocument = async (
 
   const updatedDocument = await Document.findByIdAndUpdate(
     fileId,
-    { content: newContent, title },
+    { content: newContent, title, editedAt: new Date() },
     { new: true }
   );
 
@@ -322,7 +348,7 @@ export const syncDocument = async (
   if (title !== document.title || newContent !== document.content) {
     await Document.findByIdAndUpdate(
       fileId,
-      { title, content: JSON.stringify(newContent) },
+      { title, content: JSON.stringify(newContent), editedAt: new Date() },
       { new: true }
     );
   }

@@ -71,6 +71,9 @@ const documentSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now // Automatically set the current date/time
+    },
+    editedAt: {
+        type: Date,
     }
 });
 

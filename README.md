@@ -62,6 +62,8 @@ Open http://localhost:5173 and click **Create an Account** (email + password; Go
 
 Credentials live in `backend/.env` and `frontend/.env` (both git-ignored). The defaults are local-only:
 MongoDB runs in a container, and Firebase Auth runs in the emulator on port 9099.
+MongoDB data and emulator accounts persist in Docker volumes across normal restarts.
+The auth emulator saves accounts when it stops cleanly; removing Docker volumes deletes this local data.
 
 Not available without real keys: image upload (Cloudinary) and AI features (OpenRouter).
 Leave `CLOUDINARY_*` / `OPEN_ROUTER_API_KEY` empty to keep them disabled, or fill them in to enable.

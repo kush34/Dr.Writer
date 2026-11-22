@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import apiClient from "@/service/axiosConfig";
 import axios from "axios";
+import { toast } from "sonner";
 
 const example = '{\n  "url": "https://example.com/mcp",\n  "headers": {\n    "Authorization": "Bearer YOUR_API_KEY"\n  }\n}';
 
@@ -42,15 +44,20 @@ export function McpSettings({ open, onOpenChange }: { open: boolean; onOpenChang
     try { parsed = JSON.parse(config); } catch { setError("Enter valid JSON for the server configuration."); return; }
     if (!name.trim()) { setError("Enter a server name."); return; }
     setBusy(true);
+    const serverName = name.trim();
+    const existed = servers.includes(serverName);
+    setServers((current) => current.includes(serverName) ? current : [...current, serverName]);
     try {
-      const serverName = name.trim();
       await apiClient.put(`/mcp/${encodeURIComponent(serverName)}`, parsed);
       setServers((current) => current.includes(serverName) ? current : [...current, serverName]);
       setName("");
       setConfig("");
       setNotice(`Saved ${serverName}.`);
+      toast.success(`Saved ${serverName}`);
     } catch (err) {
+      if (!existed) setServers((current) => current.filter((server) => server !== serverName));
       setError(axios.isAxiosError(err) && err.response?.data?.message || "Could not save this server. Please try again.");
+      toast.error("Could not save server");
     } finally { setBusy(false); }
   };
 
@@ -58,12 +65,16 @@ export function McpSettings({ open, onOpenChange }: { open: boolean; onOpenChang
     setBusy(true);
     setError("");
     setNotice("");
+    setServers((current) => current.filter((server) => server !== serverName));
     try {
       await apiClient.delete(`/mcp/${encodeURIComponent(serverName)}`);
       setServers((current) => current.filter((server) => server !== serverName));
       setNotice(`Removed ${serverName}.`);
+      toast.success(`Removed ${serverName}`);
     } catch (err) {
+      setServers((current) => current.includes(serverName) ? current : [...current, serverName]);
       setError(axios.isAxiosError(err) && err.response?.data?.message || "Could not remove this server. Please try again.");
+      toast.error("Could not remove server");
     } finally { setBusy(false); }
   };
 
@@ -76,7 +87,7 @@ export function McpSettings({ open, onOpenChange }: { open: boolean; onOpenChang
         </DialogHeader>
         <section aria-label="Saved MCP servers" className="space-y-2">
           <h3 className="text-sm font-semibold">Saved servers</h3>
-          {loading ? <p className="text-sm text-muted-foreground">Loading servers…</p> : servers.length === 0 ? <p className="text-sm text-muted-foreground">No servers configured.</p> : (
+          {loading ? <div role="status" aria-label="Loading servers" className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div> : servers.length === 0 ? <p className="text-sm text-muted-foreground">No servers configured.</p> : (
             <ul className="space-y-2">
               {servers.map((server) => <li key={server} className="flex items-center justify-between gap-3 rounded-md border p-2">
                 <span className="min-w-0 break-all text-sm">{server}</span>

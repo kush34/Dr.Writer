@@ -6,9 +6,12 @@ import { BrowserRouter, Routes, Route, Outlet } from "react-router";
 import { ThemeProvider } from '@/context/ThemeContext';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UserContextProvider } from './context/UserContext';
+import { CommandSearch } from './components/CommandSearch';
+import { PageSkeleton } from './components/PageSkeleton';
 
 // Lazy imports
 const App = lazy(() => import('./App'));
+const Settings = lazy(() => import('./pages/Settings'));
 const Home = lazy(() => import('./pages/Home'));
 const EditorPage = lazy(() => import('./pages/EditorPage'));
 const Landing = lazy(() => import('@/pages/Landing'));
@@ -25,7 +28,7 @@ const queryClient = new QueryClient({
 
 function ThemedRoutes() {
   return (
-    <Outlet />
+    <><CommandSearch /><Outlet /></>
   );
 }
 
@@ -37,12 +40,13 @@ if (root) {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <UserContextProvider>
-            <Suspense fallback={<div>Loading...</div>}>
+            <Suspense fallback={<PageSkeleton />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<App />} />
                 <Route element={<ThemedRoutes />}>
                   <Route path="/home" element={<Home />} />
+                  <Route path="/settings" element={<Settings />} />
                   <Route path="/home/:id" element={<EditorPage />} />
                 </Route>
               </Routes>

@@ -44,6 +44,7 @@ process.on("message", async (job: UploadQueueJob) => {
       title: job.originalName,
       sourceFileName: job.originalName,
       content: text,
+      editedAt: new Date(),
       uploadStatus: "completed",
       uploadError: null,
     });

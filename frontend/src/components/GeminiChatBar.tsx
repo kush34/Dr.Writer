@@ -4,7 +4,7 @@ import {
   SidebarMenu, SidebarMenuItem
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
-import { Check, Copy, SendHorizontal, ChevronDown } from "lucide-react";
+import { Check, Copy, SendHorizontal } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getChatsForDocument } from "@/service/document";
@@ -12,7 +12,8 @@ import { useSharedEditor } from "@/context/EditorContext";
 import apiClient from "@/service/axiosConfig";
 import { getAuth } from "firebase/auth";
 import { toast } from "sonner";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { availableModels, getDefaultModel } from "@/config/models";
+import { ChatMessagesSkeleton } from "@/components/PageSkeleton";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -34,35 +35,16 @@ type DocumentChatResponse = {
   documentChat: tChat[];
 };
 
-const availableModels = [
-  // Auto-select (OpenRouter picks an available free model)
-  "openrouter/free",
-
-  // General Purpose
-  "google/gemma-3-27b-it:free",
-  "openai/gpt-oss-120b:free",
-  "openai/gpt-oss-20b:free",
-
-  // Coding
-  "qwen/qwen3-coder:free",
-
-  // Reasoning
-  "nvidia/nemotron-3-super-120b-a12b:free",
-
-  // Vision + Tools
-  "google/gemma-4-31b-it:free",
-  "nvidia/nemotron-nano-12b-v2-vl:free",
-
-];
-
 type GeminiChatBarProps = {
   documentId: string;
   mode?: "desktop" | "mobile";
   width?: string;
+  side?: "left" | "right";
 };
 
 function GeminiChatPanel({
   data,
+  chatLoading,
   currentModel,
   actionMode,
   setActionMode,
@@ -73,8 +55,10 @@ function GeminiChatPanel({
   retrySend,
   geminiLoading,
   currentModelSetter,
+  modelChanges,
 }: {
   data: DocumentChatResponse | undefined;
+  chatLoading: boolean;
   currentModel: string;
   actionMode: boolean;
   setActionMode: (value: boolean) => void;
@@ -85,6 +69,7 @@ function GeminiChatPanel({
   retrySend: (index: number) => Promise<void>;
   geminiLoading: boolean;
   currentModelSetter: (model: string) => void;
+  modelChanges: { index: number; from: string; to: string }[];
 }) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -103,7 +88,7 @@ function GeminiChatPanel({
 
   const time = (value: string) => {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : <time dateTime={value} className="text-xs text-zinc-500">{date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>;
+    return Number.isNaN(date.getTime()) ? null : <time dateTime={value} className="text-xs text-muted-foreground">{date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>;
   };
 
   return (
@@ -119,11 +104,12 @@ function GeminiChatPanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="flex flex-col gap-2">
-          {data?.documentChat?.length === 0 ? (
-            <div className="px-4 text-zinc-500">Enter prompt for {currentModel} response</div>
+          {chatLoading ? <ChatMessagesSkeleton /> : data?.documentChat?.length === 0 ? (
+            <div className="px-4 text-muted-foreground">Enter prompt for {currentModel} response</div>
           ) : (
             data?.documentChat?.map((item, index) => (
               <div key={index} className="flex w-full flex-col gap-3">
+                {modelChanges.filter((change) => change.index === index).map((change, i) => <p key={i} role="status" className="text-center text-xs text-muted-foreground">Model changed from {change.from} to {change.to}</p>)}
                 <div className="flex flex-col items-start gap-1">
                   <div className="max-w-[80%] rounded-md bg-zinc-200 p-3 text-sm text-black">
                     {item.prompt}
@@ -161,6 +147,7 @@ function GeminiChatPanel({
               </div>
             ))
           )}
+          {modelChanges.filter((change) => change.index >= (data?.documentChat?.length ?? 0)).map((change, i) => <p key={i} role="status" className="text-center text-xs text-muted-foreground">Model changed from {change.from} to {change.to}</p>)}
         </div>
       </div>
 
@@ -174,21 +161,13 @@ function GeminiChatPanel({
                   <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${actionMode ? "left-1 translate-x-5" : "left-1"}`} />
                 </button>
                 <span>Edit</span>
-                <span className="ml-auto text-xs text-zinc-500">Shift+Tab</span>
+                <span className="ml-auto text-xs text-muted-foreground">Shift+Tab</span>
               </div>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger className="flex w-full items-center justify-between rounded border px-2 py-1">
-                  {currentModel} <ChevronDown size={16} />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-full">
-                  {availableModels.map((model) => (
-                    <DropdownMenuItem key={model} onClick={() => currentModelSetter(model)}>
-                      {model}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <p className="break-all text-xs text-muted-foreground">Model: {currentModel}</p>
+              {/^\/model(?:\s|$)/i.test(prompt) && <div className="max-h-48 overflow-y-auto rounded-md border bg-background p-1" aria-label="Available models">
+                {availableModels.filter((model) => model.toLowerCase().includes(prompt.slice(6).trim().toLowerCase())).map((model) => <button type="button" key={model} onClick={() => { currentModelSetter(model); setPrompt(""); }} className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent">{model}{model === currentModel ? " ✓" : ""}</button>)}
+              </div>}
 
               <div className="mt-2 flex">
                 <Input
@@ -196,9 +175,9 @@ function GeminiChatPanel({
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Enter your prompt"
-                  onKeyDown={(e) => e.key === "Enter" && (actionMode ? handleActions() : handleSend())}
+                  onKeyDown={(e) => { if (e.key === "Enter" && /^\/model(?:\s|$)/i.test(prompt)) { e.preventDefault(); const matches = availableModels.filter((model) => model.toLowerCase().includes(prompt.slice(6).trim().toLowerCase())); if (matches.length === 1) { currentModelSetter(matches[0]); setPrompt(""); } } else if (e.key === "Enter" && !prompt.startsWith("/")) { actionMode ? handleActions() : handleSend(); } }}
                 />
-                <SendHorizontal onClick={actionMode ? handleActions : handleSend} className="m-2 cursor-pointer text-xl" />
+                <SendHorizontal onClick={() => { if (!prompt.startsWith("/")) actionMode ? handleActions() : handleSend(); }} className="m-2 cursor-pointer text-xl" />
               </div>
             </div>
           </SidebarMenuItem>
@@ -208,17 +187,18 @@ function GeminiChatPanel({
   );
 }
 
-export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProps) {
+export function GeminiChatBar({ documentId, mode = "mobile", side = "left" }: GeminiChatBarProps) {
   const { user, loading } = useUser();
   const { editor } = useSharedEditor();
   const auth = getAuth();
   const [prompt, setPrompt] = useState<string>('');
   const [geminiLoading, setGeminiLoading] = useState<boolean>(false);
   const [actionMode, setActionMode] = useState<boolean>(false);
-  const [currentModel, setCurrentModel] = useState<string>(availableModels[0]); // default model
+  const [currentModel, setCurrentModel] = useState<string>(getDefaultModel);
+  const [modelChanges, setModelChanges] = useState<{ index: number; from: string; to: string }[]>([]);
 
   const queryClient = useQueryClient();
-  const { data } = useQuery<DocumentChatResponse>({
+  const { data, isLoading: chatLoading } = useQuery<DocumentChatResponse>({
     queryKey: ["documentChat", documentId],
     enabled: !!user && !!documentId,
     queryFn: () => getChatsForDocument(documentId)
@@ -236,7 +216,7 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
         ...(old?.documentChat ?? []),
         {
           prompt: currentPrompt,
-          response: "Applied changes to the document.",
+          response: "Applying changes to the document…",
           documentId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -249,6 +229,8 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
       const { updatedContent } = res.data;
       editor.commands.setContent(updatedContent, false);
       editor.commands.focus();
+      queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => old && ({ ...old, documentChat: old.documentChat.map((item, index) => index === old.documentChat.length - 1 ? { ...item, response: "Applied changes to the document." } : item) }));
+      toast.success("Document updated");
     } catch (err) {
       setPrompt(currentPrompt);
       queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => ({
@@ -256,7 +238,7 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
         documentChat: (old?.documentChat ?? []).slice(0, -1)
       }));
       console.log(err);
-      toast({ title: "Error", description: "LLM operation failed" });
+      toast.error("Could not update document");
     }
   };
 
@@ -345,8 +327,10 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
   const panel = (
     <GeminiChatPanel
       data={data}
+      chatLoading={chatLoading}
       currentModel={currentModel}
-      currentModelSetter={setCurrentModel}
+      currentModelSetter={(model) => { if (model !== currentModel) { setModelChanges((changes) => [...changes, { index: data?.documentChat?.length ?? 0, from: currentModel, to: model }]); setCurrentModel(model); } }}
+      modelChanges={modelChanges}
       actionMode={actionMode}
       setActionMode={setActionMode}
       prompt={prompt}
@@ -369,7 +353,7 @@ export function GeminiChatBar({ documentId, mode = "mobile" }: GeminiChatBarProp
   }
 
   return (
-    <Sidebar>
+    <Sidebar side={side}>
       <SidebarContent className="min-h-0">
         {panel}
       </SidebarContent>
