@@ -1,3 +1,16 @@
+.editor-content:has(.presentation-editor) {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.editor-content:has(.presentation-editor) .presentation-editor > header {
+  padding-inline: 48px;
+}
+
+.presentation-editor .pptx-default__workspace {
+  padding-left: 0;
+}
+
 .presentation-editor .presentation-notes[data-open="false"] {
   align-self: flex-end;
   width: min(220px, calc(100% - 24px));

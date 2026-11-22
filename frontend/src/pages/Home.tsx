@@ -149,12 +149,22 @@ const Home = () => {
             </DialogHeader>
 
             <div className="grid gap-4 py-4">
-              <label>File type <select value={kind} onChange={e => setKind(e.target.value as typeof kind)}>
-                <option value="document">Document</option><option value="presentation">PowerPoint presentation</option>
-              </select></label>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Title</Label>
+                <Label htmlFor="document-kind" className="text-right">File type</Label>
+                <select
+                  id="document-kind"
+                  value={kind}
+                  onChange={e => setKind(e.target.value as typeof kind)}
+                  className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="document">Document</option>
+                  <option value="presentation">PowerPoint presentation</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="document-title" className="text-right">Title</Label>
                 <Input
+                  id="document-title"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   className="col-span-3"

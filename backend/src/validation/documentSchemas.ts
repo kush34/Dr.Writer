@@ -7,7 +7,7 @@ export const savePresentationSchema = z.object({
 });
 export const presentationOutline = z.array(z.array(z.string().max(2000).nullable()).max(300)).max(300);
 export const presentationPlan = z.array(z.discriminatedUnion("type", [
-  z.object({ type: z.literal("append"), title: z.string().min(1).max(200), body: z.string().max(4000) }),
+  z.object({ type: z.literal("append"), title: z.string().min(1).max(200), body: z.string().min(1).max(4000) }),
   z.object({ type: z.literal("replace"), slide: z.number().int().nonnegative(), shape: z.number().int().nonnegative(), text: z.string().max(4000) }),
   z.object({ type: z.literal("addText"), slide: z.number().int().nonnegative(), text: z.string().min(1).max(4000) }),
 ])).min(1).max(60);

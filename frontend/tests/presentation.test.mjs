@@ -20,7 +20,11 @@ test("AI edits round-trip with manual edits intact and stale or invalid batches 
   applyPresentationEdits(host, host.revision(), [append, { type: "addText", slide: 0, text: "Summary" }]);
   applyPresentationEdits(host, host.revision(), [{ type: "replace", slide: 0, shape: 1, text: "Revised summary" }]);
   const reopened = createServerAutomationHost(host.save().bytes);
-  assert.deepEqual(readOutline(reopened.host).map(slide => slide.filter(Boolean)), [
+  const outline = readOutline(reopened.host).map(slide => slide.filter(Boolean));
+  assert.deepEqual(outline, [
     ["User title", "Revised summary"], ["AI title", "AI body"],
   ]);
+  const slides = reopened.host.execute({ operations: [{ op: "listSlides" }] }).results[0].value.handles;
+  const appendedShapes = reopened.host.execute({ operations: [{ op: "listShapes", container: slides[1] }] }).results[0].value.handles;
+  assert.equal(appendedShapes.length, 2);
 });
