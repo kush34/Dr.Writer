@@ -349,6 +349,14 @@ const Landing = () => {
           </div>
         </section>
 
+        <section className="mx-auto max-w-4xl px-5 pb-20 sm:px-8" aria-labelledby="guides-heading">
+          <h2 id="guides-heading" className="text-3xl font-semibold tracking-tight">Writing guides</h2>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <a href="/guides/improve-a-draft-with-ai/" className="rounded-2xl bg-[#f3f3f3] p-6 hover:bg-neutral-200"><h3 className="text-lg font-semibold">How to improve a first draft with AI →</h3><p className="mt-2 text-sm leading-6 text-neutral-600">Ask focused questions, review edits, and keep your voice.</p></a>
+            <a href="/guides/collaborate-on-a-document/" className="rounded-2xl bg-[#f3f3f3] p-6 hover:bg-neutral-200"><h3 className="text-lg font-semibold">How to collaborate on a document →</h3><p className="mt-2 text-sm leading-6 text-neutral-600">Share access, coordinate reviews, and deliver a final version.</p></a>
+          </div>
+        </section>
+
         {/* AI models */}
         <section className="bg-white px-5 py-24 text-center sm:px-8 sm:py-32">
           <p className="text-sm text-neutral-500">Your AI workspace</p>
