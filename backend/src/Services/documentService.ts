@@ -129,27 +129,30 @@ export const getDocumentData = async (userId: string, fileId: string) => {
   return document;
 };
 
-export const updateDocument = async (
-  userId: string,
-  fileId: string,
-  title: string,
-  newContent: unknown
-) => {
+/**
+ * Saves a text document only if `revision` is still the stored one, so a stale client can never
+ * overwrite newer edits. Returns the new revision; a mismatch is a 409 and nothing is written.
+ */
+const saveTextDocument = async (userId: string, fileId: string, title: string, content: unknown, revision: number) => {
   const document = await getDocumentData(userId, fileId);
   if (document.kind === "presentation") throw new AppError(400, "Use presentation save");
-
-  const updatedDocument = await Document.findByIdAndUpdate(
-    fileId,
-    { content: newContent, title, editedAt: new Date() },
-    { new: true }
+  const saved = await Document.updateOne(
+    {
+      $and: [
+        { _id: fileId },
+        // Documents created before `revision` existed have no such field, which counts as 0.
+        revision === 0 ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] } : { revision },
+        { $or: [{ user_id: userId }, { users: userId }] },
+      ],
+    },
+    { $set: { content, title, editedAt: new Date() }, $inc: { revision: 1 } }
   );
-
-  if (!updatedDocument) {
-    throw new AppError(404, "Document not found");
-  }
-
-  return updatedDocument;
+  if (!saved.modifiedCount) throw new AppError(409, "This document changed since you opened it. Your edits were not saved over the newer version.");
+  return revision + 1;
 };
+
+export const updateDocument = (userId: string, fileId: string, title: string, newContent: unknown, revision: number) =>
+  saveTextDocument(userId, fileId, title, newContent, revision);
 
 export const savePresentation = async (userId: string, id: string, revision: number, pptx: string, title?: string) => {
   const document = await getDocumentData(userId, id);
@@ -189,9 +192,6 @@ const recentRequests = async (documentId: string) => {
   } catch { return ""; }
 };
 
-export const performDocumentAction = async (
-  userId: string,
-  documentId: string,
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
 /**
@@ -219,6 +219,9 @@ const meteredCall = async (userId: string, prompt: string, system: string, call:
   }
 };
 
+export const performDocumentAction = async (
+  userId: string,
+  documentId: string,
   command: string,
   currentContent?: { type: "doc"; content: unknown[] },
   modelName?: string,
@@ -461,27 +464,8 @@ export const streamUserPrompt = async (
   }
 };
 
-export const syncDocument = async (
-  userId: string,
-  fileId: string,
-  title: string,
-  newContent: unknown
-) => {
-  const document = await findDocumentOrThrow(fileId);
-
-  if (!hasDocumentAccess(userId, document)) {
-    throw new AppError(403, "You are not authorized to access this document");
-  }
-
-  if (document.kind === "presentation") throw new AppError(400, "Use presentation save");
-  if (title !== document.title || newContent !== document.content) {
-    await Document.findByIdAndUpdate(
-      fileId,
-      { title, content: newContent, editedAt: new Date() },
-      { new: true }
-    );
-  }
-};
+export const syncDocument = (userId: string, fileId: string, title: string, newContent: unknown, revision: number) =>
+  saveTextDocument(userId, fileId, title, newContent, revision);
 
 export const getDocumentChats = async (userId: string, documentId: string) => {
   await getDocumentData(userId, documentId);

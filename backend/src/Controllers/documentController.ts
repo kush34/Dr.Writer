@@ -109,9 +109,9 @@ const getDocumentDataHandler = async (req: Request, res: Response) => {
 const updateDocumentHandler = async (req: Request, res: Response) => {
   try {
     const userId = requireAuthenticatedUser(req);
-    const { file_id, newContent, title } = updateDocumentSchema.parse(req.body);
-    const document = await updateDocument(userId, file_id, title, newContent);
-    res.status(200).send(document);
+    const { file_id, newContent, title, revision } = updateDocumentSchema.parse(req.body);
+    const nextRevision = await updateDocument(userId, file_id, title, newContent, revision);
+    res.status(200).json({ revision: nextRevision });
   } catch (error) {
     handleControllerError(res, error);
   }
@@ -166,9 +166,9 @@ const userPromptHandler = async (req: Request, res: Response) => {
 const syncDocumentHandler = async (req: Request, res: Response) => {
   try {
     const userId = requireAuthenticatedUser(req);
-    const { file_id, title, newContent } = syncDocumentSchema.parse(req.body);
-    await syncDocument(userId, file_id, title, newContent);
-    res.status(200).send("document synced");
+    const { file_id, title, newContent, revision } = syncDocumentSchema.parse(req.body);
+    const nextRevision = await syncDocument(userId, file_id, title, newContent, revision);
+    res.status(200).json({ revision: nextRevision });
   } catch (error) {
     handleControllerError(res, error);
   }

@@ -48,6 +48,8 @@ export const updateDocumentSchema = z.object({
   file_id: z.string().trim().min(1),
   newContent: z.unknown(),
   title: z.string().trim().min(1).max(255),
+  // The revision the client last loaded or saved. A stale value is rejected with 409.
+  revision: z.number().int().nonnegative(),
 });
 
 export const addUserSchema = z.object({
@@ -100,6 +102,8 @@ export const syncDocumentSchema = z.object({
   file_id: z.string().trim().min(1),
   title: z.string().trim().min(1).max(255),
   newContent: z.unknown(),
+  // The server revision the offline edits were based on.
+  revision: z.number().int().nonnegative(),
 });
 
 export const getChatsParamsSchema = z.object({

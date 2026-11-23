@@ -82,14 +82,22 @@ type Props = {
   id: string
   title: string
   content: JSONContent
+  /** The server revision these edits were based on; a stale one is refused with 409. */
+  revision: number
 }
-export const updateDocumentApi = async ({ id, title, content }: Props) => {
-  await apiClient.post("/document/documentUpdate", {
+/** Saves a text document and returns its new revision. Rejects with a 409 error if it changed meanwhile. */
+export const updateDocumentApi = async ({ id, title, content, revision }: Props): Promise<number> => {
+  const res = await apiClient.post("/document/documentUpdate", {
     file_id: id,
     title,
     newContent: content,
+    revision,
   });
+  return res.data.revision;
 };
+
+export const isConflictError = (error: unknown) =>
+  (error as { response?: { status?: number } })?.response?.status === 409;
 
 export const getChatsForDocument = async (documentId: string) => {
   const res = await apiClient.get(`/document/getChats/${documentId}`)

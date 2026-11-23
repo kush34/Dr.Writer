@@ -15,6 +15,8 @@ export type DocumentDTO = {
   kind?: "presentation" | "document";
   pptx?: string;
   revision?: number;
+  /** An offline copy that could not be synced because the server document changed. */
+  offlineConflict?: { title: string; newContent: JSONContent; revision?: number };
   _id: string;
   title: string;
   content: JSONContent;

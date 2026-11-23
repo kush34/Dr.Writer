@@ -71,26 +71,35 @@ export const deleteDocument = async (id) => {
 };
 
 
-export const syncData = async (id)=>{
-  const documentToBeUpdated = await getDocument(id)
-  // console.log(documentToBeUpdated);
+export type OfflineDocument = { _id: string; title: string; newContent: any; revision?: number };
+export type SyncResult = true | { conflict: OfflineDocument };
+
+/**
+ * Pushes an offline copy to the server. Returns `{ conflict }` (and keeps the local copy) when the
+ * server document changed since the copy was made, or when the copy has no known base revision.
+ * The local copy is only deleted after the server accepted it.
+ */
+export const syncData = async (id: string): Promise<SyncResult> => {
+  const documentToBeUpdated = (await getDocument(id)) as OfflineDocument | undefined
   if(!documentToBeUpdated){
-    console.log(`no document sync required`);
     return true;
-  } 
+  }
+  if (!Number.isInteger(documentToBeUpdated.revision)) {
+    // Saved before revisions existed: there is no way to tell whether it is stale.
+    return { conflict: documentToBeUpdated };
+  }
 
-  const response = await apiClient.post('/document/syncDocument',{
-    file_id:documentToBeUpdated._id,
-    title:documentToBeUpdated.title,
-    newContent:documentToBeUpdated.newContent
-  })
-  console.log(response);
-  if(response.status == 200){
-    await deleteDocument(id)
-    return true;
+  try {
+    await apiClient.post('/document/syncDocument',{
+      file_id:documentToBeUpdated._id,
+      title:documentToBeUpdated.title,
+      newContent:documentToBeUpdated.newContent,
+      revision:documentToBeUpdated.revision
+    })
+  } catch (error) {
+    if ((error as { response?: { status?: number } })?.response?.status === 409) return { conflict: documentToBeUpdated };
+    throw error;
   }
-  else{
-    console.log(`there was problem in syncing data`);
-  }
+  await deleteDocument(id)
+  return true;
 }
-
