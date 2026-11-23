@@ -9,8 +9,36 @@ import {
   Presentation, Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import "./landing-models.css";
 import { availableModels } from "@/config/models";
+
+// Adapted from Aceternity UI's Layout Text Flip.
+function LayoutTextFlip() {
+  const providers = [
+    { name: "ChatGPT", logo: "/model-logos/openai.svg", color: "#dff5ea" },
+    { name: "Claude", logo: "/model-logos/claude.svg", color: "#fae8df" },
+    { name: "Gemini", logo: "/model-logos/googlegemini.svg", color: "#e8efff" },
+    { name: "OpenRouter", logo: "/model-logos/openrouter.svg", color: "#ede8fc" },
+  ];
+  const [index, setIndex] = useState(0);
+  const reducedMotion = useReducedMotion();
+  useEffect(() => {
+    if (reducedMotion) return;
+    const timer = window.setInterval(() => setIndex(value => (value + 1) % providers.length), 3000);
+    return () => window.clearInterval(timer);
+  }, [reducedMotion]);
+  const provider = providers[index];
+  return <span className="provider-flip" aria-label="ChatGPT, Claude, Gemini and OpenRouter">
+    <motion.span layout className="provider-flip-layout" aria-hidden="true">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span key={provider.name} className="provider-flip-item" initial={{ y: -35, opacity: 0, filter: "blur(8px)" }} animate={{ y: 0, opacity: 1, filter: "blur(0px)" }} exit={{ y: 35, opacity: 0, filter: "blur(8px)" }} transition={{ duration: 0.4 }}>
+          <span className="provider-flip-icon" style={{ backgroundColor: provider.color }}><img src={provider.logo} alt="" /></span>{provider.name}
+        </motion.span>
+      </AnimatePresence>
+    </motion.span>
+  </span>;
+}
 
 function HeroEditor() {
   const [editMode, setEditMode] = useState(false);
@@ -90,19 +118,6 @@ function ModelDemo() {
   </div>;
 }
 
-const audiences = [
-  "Students",
-  "Researchers",
-  "Content teams",
-  "Writers",
-  "Freelancers",
-  "Operations",
-  "Agencies",
-  "Founders",
-  "Editors",
-  "Collaborators",
-];
-
 const faqs = [
   {
     question: "What makes Dr.Writer different from a basic document editor?",
@@ -175,7 +190,7 @@ const Landing = () => {
         {/* Hero */}
         <section className="bg-white px-5 pb-16 pt-20 text-center sm:px-8 sm:pt-24 lg:pt-28">
           <h1 className="mx-auto max-w-5xl text-5xl font-semibold leading-[1.04] tracking-[-0.055em] text-[#101010] sm:text-7xl lg:text-[88px]">
-            Your space to<br /><span className="hero-words" aria-label="write, refine, and create"><span aria-hidden="true">write</span><span aria-hidden="true">refine</span><span aria-hidden="true">create</span></span><br /><span className="bg-gradient-to-b from-[#111] to-[#999] bg-clip-text text-transparent">with AI by your side.</span>
+            Your workspace for<br /><LayoutTextFlip /><br /><span className="bg-gradient-to-b from-[#111] to-[#999] bg-clip-text text-transparent">and your best ideas.</span>
           </h1>
           <p className="mx-auto mt-7 max-w-xl text-base leading-7 text-neutral-500 sm:text-lg">Write, edit, and collaborate in one place. Dr.Writer brings your documents and AI assistance together, so you can stay focused on the words.</p>
           <Button asChild className="mt-8 h-12 rounded-full bg-[#111] px-7 text-white hover:bg-slate-800"><a href="/login">Start writing <ArrowRight className="ml-2 h-4 w-4" /></a></Button>
@@ -225,25 +240,6 @@ const Landing = () => {
               <div className="layout-demo-chat"><div className="layout-demo-chat-title"><span className="layout-demo-logo">✦</span> Dr.Writer <span className="layout-demo-muted">AI assistant</span></div><div className="layout-demo-chat-body"><div className="layout-demo-user">Help me make this clearer.</div><div className="layout-demo-response">Try leading with the main idea, then add the details that support it.</div></div><div className="layout-demo-chat-input">Ask about your draft… <span>↑</span></div></div>
               <div className="layout-demo-document"><div className="layout-demo-toolbar"><strong>Untitled document</strong><span>Saved &nbsp; ···</span></div><div className="layout-demo-format">↶ &nbsp; ↷ &nbsp; │ &nbsp; H⌄ &nbsp; ☷ &nbsp; <b>B</b> &nbsp; <i>I</i> &nbsp; ↗</div><div className="layout-demo-page"><div className="layout-demo-kicker">THE FIRST DRAFT</div><h3>Good ideas start<br />with a few words.</h3><p>Every great piece begins somewhere. Give your ideas the space to grow, one sentence at a time.</p><p>Write freely, find the right shape, and make it yours.</p><div className="layout-demo-cursor" /></div></div>
               <div className="layout-demo-dock"><div><span className="layout-demo-logo">✦</span> <strong>Dr.Writer</strong><span className="layout-demo-muted"> &nbsp; AI assistant</span></div><div className="layout-demo-dock-input">Describe changes to your document… <span>↑</span></div></div>
-            </div>
-          </div>
-        </section>
-
-        {/* Audience ticker */}
-        <section className="overflow-hidden py-10">
-          <div className="mx-auto flex max-w-[1320px] flex-col items-center px-5 text-center sm:px-8">
-            <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-              For everyone who works with words
-            </h2>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-              {audiences.map((audience) => (
-                <div
-                  key={audience}
-                  className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
-                >
-                  {audience}
-                </div>
-              ))}
             </div>
           </div>
         </section>

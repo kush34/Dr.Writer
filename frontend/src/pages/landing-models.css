@@ -73,12 +73,11 @@
 @media (max-width: 767px) { .hero-editor-frame { margin-top: 64px; padding: 9px; border-radius: 20px; overflow-x: auto; }.hero-editor-window { min-width: 720px; }.hero-editor-body { grid-template-columns: 1fr 1fr; min-height: 550px; }.hero-editor-chat-header, .hero-editor-doc-header { height: 48px; padding: 0 10px; }.hero-editor-top-end { display: none; }.hero-editor-conversation { padding: 14px 10px; font-size: 10px; }.hero-editor-answer { max-width: 100%; padding: 9px; }.hero-editor-question { max-width: 100%; padding: 9px; }.hero-editor-composer { padding: 10px; }.hero-editor-input { font-size: 9px; }.hero-editor-modes { font-size: 9px; }.hero-editor-tools { gap: 9px; padding: 0 10px; }.hero-editor-page { margin-top: 25px; padding: 0 14px; }.hero-editor-page p { font-size: 10px; line-height: 1.65; }.hero-editor-page h3 { font-size: 22px; }.hero-editor-page h4 { margin-top: 15px; font-size: 12px; } }
 @media (prefers-reduced-motion: reduce) { .hero-editor-caret { animation: none; } }
 
-.hero-words { position: relative; display: inline-grid; min-width: 3.5em; overflow: hidden; vertical-align: bottom; }
-.hero-words > span { grid-area: 1 / 1; opacity: 0; animation: hero-word-cycle 9s cubic-bezier(.23,1,.32,1) infinite; }
-.hero-words > span:nth-child(2) { animation-delay: 3s; }
-.hero-words > span:nth-child(3) { animation-delay: 6s; }
-@keyframes hero-word-cycle { 0% { opacity: 0; transform: translateY(45%); } 5%, 28% { opacity: 1; transform: translateY(0); } 33%, 100% { opacity: 0; transform: translateY(-45%); } }
-@media (prefers-reduced-motion: reduce) { .hero-words > span { animation: none; opacity: 0; } .hero-words > span:first-child { opacity: 1; } }
+.provider-flip { display: inline-flex; justify-content: center; max-width: 100%; vertical-align: bottom; }
+.provider-flip-layout { display: inline-flex; position: relative; overflow: hidden; padding: .08em .04em; }
+.provider-flip-item { display: inline-flex; align-items: center; gap: .18em; white-space: nowrap; }
+.provider-flip-icon { display: inline-grid; flex: none; place-items: center; width: .82em; height: .82em; border-radius: 25%; }
+.provider-flip-icon img { width: 58%; height: 58%; object-fit: contain; }
 
 @media (prefers-reduced-motion: reduce) { .hero-editor-switch:before { transition: none; } }
 
