@@ -20,7 +20,7 @@ import apiClient from "@/service/axiosConfig";
 import { isAxiosError } from "axios";
 import { getAuth } from "firebase/auth";
 import { toast } from "@/components/ui/rare-toast";
-import { getDefaultModel } from "@/config/models";
+import { getDefaultModel, weakModelReason } from "@/config/models";
 import { ModelSelector } from "@/components/ModelSelector";
 import { ChatMessagesSkeleton } from "@/components/PageSkeleton";
 import ReactMarkdown from "react-markdown";
@@ -214,6 +214,7 @@ function GeminiChatPanel({
               {citation && <div className="rounded-md border bg-muted p-2 text-xs"><div className="flex justify-between gap-2"><span className="font-semibold">Selected text</span><button type="button" onClick={() => setCitation("")} aria-label="Remove cited text">Remove</button></div><p className="mt-1 max-h-20 overflow-auto whitespace-pre-wrap">{citation}</p></div>}
 
               <div className="flex items-center justify-between gap-2"><div ref={modelPickerRef}><ModelSelector value={currentModel} onChange={currentModelSetter} /></div>{docMode && <button type="button" aria-label="Switch to chat mode" title="Switch to chat mode" className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => setDocMode(false)}><MessageSquare size={16} /></button>}</div>
+              {(docMode || actionMode) && weakModelReason(currentModel) && <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-900 dark:text-amber-200">{weakModelReason(currentModel)} Pick a larger model for edits.</p>}
 
               {docMode ? <PromptBox
                 className="w-full max-w-none"
