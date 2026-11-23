@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite"
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { guides } from "./src/content/guides.js"
+import { infoPages } from "./src/content/about.js"
 import { renderGuide } from "./scripts/guide-template.mjs"
 
 // https://vite.dev/config/
@@ -22,6 +23,12 @@ export default defineConfig(({ mode }) => {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+        const page = infoPages.find(item => pathname === `/${item.slug}` || pathname === `/${item.slug}/`);
+        if (page) {
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.end(renderGuide(page, origin, `/${page.slug}/`));
+          return;
+        }
         if (!pathname.startsWith("/guides/")) return next();
         const guide = guides.find(item => pathname === `/guides/${item.slug}` || pathname === `/guides/${item.slug}/`);
         if (!guide) {
@@ -39,7 +46,7 @@ export default defineConfig(({ mode }) => {
     },
     generateBundle() {
       if (!origin) return;
-      this.emitFile({ type: "asset", fileName: "sitemap.xml", source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${origin}/</loc></url>${guides.map(guide => `<url><loc>${origin}/guides/${guide.slug}/</loc></url>`).join("")}</urlset>\n` });
+      this.emitFile({ type: "asset", fileName: "sitemap.xml", source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${origin}/</loc></url>${infoPages.map(page => `<url><loc>${origin}/${page.slug}/</loc></url>`).join("")}${guides.map(guide => `<url><loc>${origin}/guides/${guide.slug}/</loc></url>`).join("")}</urlset>\n` });
       this.emitFile({ type: "asset", fileName: "robots.txt", source: `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n` });
     },
   }],

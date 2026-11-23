@@ -503,6 +503,9 @@ const Landing = () => {
               <a href="/login" className="block transition hover:text-slate-900">
                 Open workspace
               </a>
+              <a href="/about/" className="block transition hover:text-slate-900">About &amp; contact</a>
+              <a href="/privacy/" className="block transition hover:text-slate-900">Privacy</a>
+              <a href="/terms/" className="block transition hover:text-slate-900">Terms</a>
               <p>© {new Date().getFullYear()} Dr.Writer</p>
             </div>
           </div>
