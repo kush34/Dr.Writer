@@ -377,7 +377,11 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   useEffect(() => {
     if (!editor || !user || !id) return;
 
-    socket.emit("enter", user.email, id);
+    // Rooms are per connection, so join again after every (re)connect.
+    const enter = () => socket.emit("enter", user.email, id);
+    socket.on("connect", enter);
+    if (socket.connected) enter();
+    else socket.connect();
 
     socket.on("text-changes", ({ content, sender }) => {
       if (sender === user.email) return;
@@ -385,8 +389,10 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
     });
 
     return () => {
+      socket.off("connect", enter);
       socket.off("enter");
       socket.off("text-changes");
+      socket.disconnect();
     }
   }, [editor, user, id]);
   return (
