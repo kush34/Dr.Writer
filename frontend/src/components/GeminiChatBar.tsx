@@ -14,8 +14,9 @@ import { AiStatus } from "@/components/ui/ai-status";
 import { PromptBox } from "@/components/ui/prompt-box";
 import { ArrowDown, Bot, Check, Copy, MessageSquare, PanelBottom, SendHorizontal } from "lucide-react";
 import { useUser } from "@/context/UserContext";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getChatsForDocument } from "@/service/document";
+import type { DocumentDTO } from "@/types";
 import { useSharedEditor } from "@/context/EditorContext";
 import apiClient from "@/service/axiosConfig";
 import { isAxiosError } from "axios";
@@ -83,8 +84,10 @@ function GeminiChatPanel({
   retrySend,
   geminiLoading,
   currentModelSetter,
-  modelChanges, docMode, setDocMode, citation, setCitation, docStatus, editLoading, editPreview, reviewSummary, reviewInDocument, onReviewDecision, question,
+  canEdit, modelChanges, docMode, setDocMode, citation, setCitation, docStatus, editLoading, editPreview, reviewSummary, reviewInDocument, onReviewDecision, question,
 }: {
+  /** Viewers and commenters can ask questions about the document but not request edits. */
+  canEdit: boolean;
   docMode: boolean; setDocMode: (value: boolean) => void;
   citation: string; setCitation: (value: string) => void; docStatus: string; editLoading: boolean; editPreview: string; reviewSummary: string | null; reviewInDocument: boolean; onReviewDecision: (accept: boolean) => void; question: string | null;
   data: DocumentChatResponse | undefined;
@@ -205,7 +208,8 @@ function GeminiChatPanel({
           <SidebarMenuItem>
             <div className="flex flex-col gap-2">
               {!docMode && editLoading && <AiStatus state="writing" label={docStatus || "Preparing edits"} timer={false} />}
-              {!docMode && <div className="flex items-center gap-2 text-sm">
+              {!docMode && !canEdit && <p role="status" className="text-xs text-muted-foreground">You have view-only access, so you can ask questions but not request edits.</p>}
+              {!docMode && canEdit && <div className="flex items-center gap-2 text-sm">
                 <span>Discuss</span>
                 <button type="button" role="switch" aria-label="Edit mode" aria-checked={actionMode} title="Switch mode (Shift+Tab)" onClick={() => setActionMode(!actionMode)} className={`relative h-6 w-11 rounded-full transition-colors ${actionMode ? "bg-primary" : "bg-zinc-400"}`}>
                   <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${actionMode ? "left-1 translate-x-5" : "left-1"}`} />
@@ -218,7 +222,7 @@ function GeminiChatPanel({
               <div className="flex items-center justify-between gap-2"><div ref={modelPickerRef}><ModelSelector value={currentModel} onChange={currentModelSetter} /></div>{docMode && <button type="button" aria-label="Switch to chat mode" title="Switch to chat mode" className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => setDocMode(false)}><MessageSquare size={16} /></button>}</div>
               {(docMode || actionMode) && weakModelReason(currentModel) && <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-900 dark:text-amber-200">{weakModelReason(currentModel)} Pick a larger model for edits.</p>}
 
-              {docMode ? <PromptBox
+              {docMode && !canEdit ? <p role="status" className="rounded-md border px-3 py-2 text-xs text-muted-foreground">You have view-only access, so edits are disabled. Switch to chat mode to ask questions about the document.</p> : docMode ? <PromptBox
                 className="w-full max-w-none"
                 value={prompt}
                 onValueChange={setPrompt}
@@ -289,6 +293,9 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
   const [modelChanges, setModelChanges] = useState<{ index: number; from: string; to: string }[]>([]);
 
   const queryClient = useQueryClient();
+  // Read the role the editor already loaded; this query never fetches on its own.
+  const { data: documentInfo } = useQuery<DocumentDTO>({ queryKey: ["document", documentId], queryFn: skipToken });
+  const canEdit = !documentInfo?.role || documentInfo.role === "owner" || documentInfo.role === "editor";
   const { data, isLoading: chatLoading } = useQuery<DocumentChatResponse>({
     queryKey: ["documentChat", documentId],
     enabled: !!user && !!documentId,
@@ -304,7 +311,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
   };
 
   const handleActions = async () => {
-    if (!prompt.trim() || geminiLoading) return;
+    if (!canEdit || !prompt.trim() || geminiLoading) return;
     requestNotificationPermission();
     setEditPreview("");
     const showPreview = (text: string) => setEditPreview(current => current ? `${current}\n\n${text}` : text);
@@ -521,8 +528,9 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
       currentModel={currentModel}
       currentModelSetter={(model) => { if (model !== currentModel) { setModelChanges((changes) => [...changes, { index: data?.documentChat?.length ?? 0, from: currentModel, to: model }]); setCurrentModel(model); } }}
       modelChanges={modelChanges}
-      actionMode={actionMode}
-      setActionMode={setActionMode}
+      canEdit={canEdit}
+      actionMode={canEdit && actionMode}
+      setActionMode={(value) => { if (canEdit) setActionMode(value); }}
       prompt={prompt}
       setPrompt={setPrompt}
       handleActions={handleActions}

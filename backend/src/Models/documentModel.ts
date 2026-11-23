@@ -53,7 +53,10 @@ const documentSchema = new mongoose.Schema({
     user_id: {
         type: mongoose.Schema.Types.ObjectId, ref: 'User'
     },
+    // Collaborator roles. `users` holds editors (the original flat list); the owner is `user_id`.
     users: [String],
+    commenters: [String],
+    viewers: [String],
     relatedImages: {
         type: [relatedImageSchema],
         default: [],

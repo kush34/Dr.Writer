@@ -206,3 +206,20 @@ export const uploadDocumentImage = async (
 
   return registerRes.data.image.url as string;
 };
+
+export type ShareRole = "editor" | "commenter" | "viewer";
+export type DocumentMember = { userId: string; email: string; name?: string; role: "owner" | ShareRole };
+
+export const fetchDocumentMembers = async (documentId: string): Promise<DocumentMember[]> => {
+  const res = await apiClient.get(`/document/${documentId}/members`);
+  return res.data.members;
+};
+
+/** Shares the document, or changes the role of someone it is already shared with. */
+export const shareDocument = async (documentId: string, userToAddMail: string, role: ShareRole) => {
+  await apiClient.post("/document/adduser", { file_id: documentId, userToAddMail, role });
+};
+
+export const removeDocumentMember = async (documentId: string, userId: string) => {
+  await apiClient.delete(`/document/${documentId}/users/${userId}`);
+};

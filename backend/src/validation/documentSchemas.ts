@@ -52,9 +52,18 @@ export const updateDocumentSchema = z.object({
   revision: z.number().int().nonnegative(),
 });
 
+export const shareRoleSchema = z.enum(["editor", "commenter", "viewer"]);
+
 export const addUserSchema = z.object({
   file_id: z.string().trim().min(1),
   userToAddMail: z.string().trim().email(),
+  // Defaults to editor so clients that predate roles keep their old behavior.
+  role: shareRoleSchema.default("editor"),
+});
+
+export const removeUserParamsSchema = z.object({
+  documentId: z.string().trim().min(1),
+  userId: z.string().trim().min(1),
 });
 
 export const documentActionParamsSchema = z.object({

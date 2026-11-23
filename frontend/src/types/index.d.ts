@@ -11,7 +11,11 @@ export type RelatedImageDTO = {
   uploadedAt: string;
 };
 
+export type DocumentRole = "owner" | "editor" | "commenter" | "viewer";
+
 export type DocumentDTO = {
+  /** The signed-in user's role on this document. Only owners and editors may change it. */
+  role?: DocumentRole;
   kind?: "presentation" | "document";
   pptx?: string;
   revision?: number;

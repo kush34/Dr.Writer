@@ -15,6 +15,7 @@ import { Superscript } from "@tiptap/extension-superscript"
 import { Selection } from "@tiptap/extensions"
 
 // --- UI Primitives ---
+import type { DocumentRole } from "@/types"
 import { Button } from "@/components/tiptap-ui-primitive/button"
 import { Spacer } from "@/components/tiptap-ui-primitive/spacer"
 import {
@@ -201,10 +202,13 @@ type SimpleEditorProps = {
   title: string;
   onEditorReady?: (editor: Editor) => void;
   updateDocument: (content: JSONContent, title: string, automatic: boolean) => Promise<void>;
+  /** The user's role. Anyone but an owner or editor gets a read-only document. */
+  role?: DocumentRole;
 };
 
 
-export function SimpleEditor({ title, content, onEditorReady, updateDocument }: SimpleEditorProps) {
+export function SimpleEditor({ title, content, onEditorReady, updateDocument, role }: SimpleEditorProps) {
+  const readOnly = !!role && role !== "owner" && role !== "editor"
   const isMobile = useIsBreakpoint()
   const navigate = useNavigate();
   const { id } = useParams();
@@ -227,6 +231,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
 
   const editor = useEditor({
     immediatelyRender: false,
+    editable: !readOnly,
     editorProps: {
       attributes: {
         autocomplete: "off",
@@ -279,7 +284,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   const blocker = useBlocker(dirty || saving)
 
   const save = async (automatic: boolean) => {
-    if (!editor || savingRef.current || reviewPendingRef.current || !snapshot) return
+    if (readOnly || !editor || savingRef.current || reviewPendingRef.current || !snapshot) return
     const currentContent = editor.getJSON()
     const currentTitle = localTitle
     savingRef.current = true
@@ -297,7 +302,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
   }
 
   useEffect(() => {
-    if (!autosave || !dirty || saving || reviewPending || snapshot === attemptedSnapshot.current) return
+    if (readOnly || !autosave || !dirty || saving || reviewPending || snapshot === attemptedSnapshot.current) return
     const timer = window.setTimeout(() => void save(true), 1000)
     return () => window.clearTimeout(timer)
   }, [autosave, dirty, saving, snapshot, revision, reviewPending])
@@ -401,16 +406,25 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
         <input
           aria-label="Document title"
           disabled={reviewPending}
+          readOnly={readOnly}
           className="min-w-0 flex-1 rounded bg-transparent px-2 text-xl font-bold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
           value={localTitle}
           onChange={(e) => setLocalTitle(e.target.value)}
         />
-        <label className="flex shrink-0 items-center gap-1 text-sm text-foreground">
-          <input type="checkbox" checked={autosave} onChange={(event) => { attemptedSnapshot.current = null; setAutosave(event.target.checked) }} />
-          Autosave
-        </label>
-        <span role="status" className="shrink-0 text-xs text-muted-foreground">{reviewPending ? "Reviewing changes" : saving ? "Saving…" : dirty ? "Unsaved" : "Saved"}</span>
-        <ShareFileDialog />
+        {readOnly ? (
+          <span role="status" className="shrink-0 rounded border px-2 py-0.5 text-xs text-muted-foreground" title={role === "commenter" ? "Commenting is not available yet, so commenters can only read for now." : undefined}>
+            {role === "commenter" ? "Comment only (read-only for now)" : "View only"}
+          </span>
+        ) : (
+          <>
+            <label className="flex shrink-0 items-center gap-1 text-sm text-foreground">
+              <input type="checkbox" checked={autosave} onChange={(event) => { attemptedSnapshot.current = null; setAutosave(event.target.checked) }} />
+              Autosave
+            </label>
+            <span role="status" className="shrink-0 text-xs text-muted-foreground">{reviewPending ? "Reviewing changes" : saving ? "Saving…" : dirty ? "Unsaved" : "Saved"}</span>
+          </>
+        )}
+        {role === "owner" && <ShareFileDialog />}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button aria-label="Export document" disabled={!editor || reviewPending}><Download /></Button>
@@ -420,11 +434,11 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
             <DropdownMenuItem onSelect={() => void exportDocument("docx")}>Export as DOCX</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button
+        {!readOnly && <Button
           aria-label="Save document" disabled={!editor || saving || reviewPending}
           onClick={() => void save(false)}>
           <SaveAll />
-        </Button>
+        </Button>}
         <Button aria-label="Back to documents" onClick={() => navigate("/home")}>
           <Undo2 />
         </Button>
@@ -442,7 +456,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
         </DialogContent>
       </Dialog>
       <EditorContext.Provider value={{ editor }}>
-        <fieldset disabled={reviewPending} className="contents" aria-label="Editing tools">
+        {!readOnly && <fieldset disabled={reviewPending} className="contents" aria-label="Editing tools">
         <Toolbar
           ref={toolbarRef}
           style={{
@@ -466,7 +480,7 @@ export function SimpleEditor({ title, content, onEditorReady, updateDocument }: 
             />
           )}
         </Toolbar>
-        </fieldset>
+        </fieldset>}
         <EditorContent
           editor={editor}
           role="presentation"

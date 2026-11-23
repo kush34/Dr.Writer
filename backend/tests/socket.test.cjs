@@ -7,10 +7,17 @@ process.env.FIREBASE_PRIVATE_KEY ||= require("node:crypto").generateKeyPairSync(
 const Document = require("../dist/Models/documentModel").default;
 const userService = require("../dist/Services/userService");
 const { registerSocket } = require("../dist/socket");
+const { documentAccessChanged } = require("../dist/utils/documentAccessEvents");
 
 const setup = () => {
   let middleware, onConnection;
-  registerSocket({ use: fn => { middleware = fn; }, on: (name, fn) => { if (name === "connection") onConnection = fn; } });
+  const connected = [];
+  // `in(room).fetchSockets()` mirrors socket.io: it returns the sockets currently in the room.
+  registerSocket({
+    use: fn => { middleware = fn; },
+    on: (name, fn) => { if (name === "connection") onConnection = fn; },
+    in: room => ({ fetchSockets: async () => connected.filter(socket => socket.rooms.has(room)) }),
+  });
   const connect = async token => {
     const emitted = [];
     const relayed = [];
@@ -20,12 +27,13 @@ const setup = () => {
       data: {},
       rooms: new Set(),
       join: room => socket.rooms.add(room),
+      leave: room => socket.rooms.delete(room),
       emit: (...args) => emitted.push(args),
       to: room => ({ emit: (...args) => relayed.push([room, ...args]) }),
       on: (name, fn) => { handlers[name] = fn; },
     };
     const error = await new Promise(resolve => middleware(socket, resolve));
-    if (!error) onConnection(socket);
+    if (!error) { onConnection(socket); connected.push(socket); }
     return { socket, error, handlers, emitted, relayed };
   };
   return connect;
@@ -77,4 +85,47 @@ test("a socket joins a document room only with document access, and cannot relay
   await member.handlers.enter("member@example.com", "doc");
   assert.equal(member.socket.rooms.has("doc"), true);
   assert.equal(owner.handlers.test, undefined);
+});
+
+test("viewers and commenters join the room and receive changes but cannot relay their own", async t => {
+  const connect = setup();
+  t.mock.method(userService, "verifyFirebaseTokenAndEnsureUser", async token => ({ user: { _id: token, email: `${token}@example.com` } }));
+  t.mock.method(Document, "findById", async () => ({ user_id: "owner", users: ["editor"], commenters: ["commenter"], viewers: ["viewer"], kind: "document" }));
+  const sent = {};
+  for (const who of ["owner", "editor", "commenter", "viewer"]) {
+    const client = await connect(who);
+    await client.handlers.enter("x", "doc");
+    assert.equal(client.socket.rooms.has("doc"), true, `${who} joins`);
+    client.handlers["text-changes"]({ content: who }, "doc");
+    sent[who] = client.relayed.filter(entry => entry[1] === "text-changes").length;
+  }
+  assert.deepEqual(sent, { owner: 1, editor: 1, commenter: 0, viewer: 0 });
+});
+
+test("a socket loses the room, or the right to relay, as soon as its access changes", async t => {
+  const connect = setup();
+  t.mock.method(userService, "verifyFirebaseTokenAndEnsureUser", async token => ({ user: { _id: token, email: `${token}@example.com` } }));
+  const doc = { user_id: "owner", users: ["member"], commenters: [], viewers: [], kind: "document" };
+  t.mock.method(Document, "findById", async () => doc);
+  const member = await connect("member");
+  await member.handlers.enter("x", "doc");
+  member.handlers["text-changes"]({ content: "1" }, "doc");
+  assert.equal(member.relayed.filter(entry => entry[1] === "text-changes").length, 1);
+
+  // Downgraded to viewer: still in the room, but can no longer push edits.
+  Object.assign(doc, { users: [], viewers: ["member"] });
+  documentAccessChanged("doc");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(member.socket.rooms.has("doc"), true);
+  member.handlers["text-changes"]({ content: "2" }, "doc");
+  assert.equal(member.relayed.filter(entry => entry[1] === "text-changes").length, 1);
+
+  // Removed entirely: kicked from the room and told so.
+  Object.assign(doc, { viewers: [] });
+  documentAccessChanged("doc");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(member.socket.rooms.has("doc"), false);
+  assert.deepEqual(member.emitted.at(-1), ["enter-denied", "doc"]);
+  member.handlers["text-changes"]({ content: "3" }, "doc");
+  assert.equal(member.relayed.filter(entry => entry[1] === "text-changes").length, 1);
 });

@@ -15,6 +15,7 @@ import { applyEdits } from "../utils/applyEdits";
 import { documentToMarkdownBlocks } from "../utils/markdown";
 import { validateDocumentOperations } from "../utils/llmActions";
 import { AppError, isAppError } from "../utils/appError";
+import { documentAccessChanged } from "../utils/documentAccessEvents";
 import { openRouterStream, openRouterComplete, openRouterWithTools } from "../service/openrouter";
 import { getMcpConfig } from "../service/mcpConfig";
 import { connectMcpServers } from "../service/mcpClient";
@@ -59,12 +60,31 @@ const findDocumentOrThrow = async (documentId: string) => {
 const isDocumentOwner = (userId: string, ownerId: unknown) =>
   ownerId?.toString() === userId.toString();
 
-const hasDocumentAccess = (
-  userId: string,
-  document: { user_id?: unknown; users: string[] }
-) =>
-  isDocumentOwner(userId, document.user_id) ||
-  document.users.includes(userId.toString());
+export type DocumentRole = "owner" | "editor" | "commenter" | "viewer";
+type RoleSource = { user_id?: unknown; users?: string[]; commenters?: string[]; viewers?: string[] };
+
+/** The user's strongest role on a document, or null when they have no access. Missing arrays (older documents) count as empty. */
+export const getDocumentRole = (userId: string, document: RoleSource): DocumentRole | null => {
+  const id = userId.toString();
+  if (isDocumentOwner(id, document.user_id)) return "owner";
+  if (document.users?.includes(id)) return "editor";
+  if (document.commenters?.includes(id)) return "commenter";
+  if (document.viewers?.includes(id)) return "viewer";
+  return null;
+};
+
+export const canEditRole = (role: DocumentRole | null) => role === "owner" || role === "editor";
+
+const hasDocumentAccess = (userId: string, document: RoleSource) => getDocumentRole(userId, document) !== null;
+
+const anyRoleFilter = (userId: string) => ({
+  $or: [{ user_id: userId }, { users: userId }, { commenters: userId }, { viewers: userId }],
+});
+
+/** Throws unless the user may change the document. Commenters ship read-only until comments exist. */
+const assertCanEdit = (role: DocumentRole | null) => {
+  if (!canEditRole(role)) throw new AppError(403, "You have view-only access to this document");
+};
 
 export const getTestDocument = async () => {
   const testFileId = process.env.testFile;
@@ -89,8 +109,8 @@ export const createDocument = async (userId: string, title: string, kind: "docum
 };
 
 export const getDocumentList = async (userId: string) => {
-  const documents = await Document.find({ $or: [{ user_id: userId }, { users: userId }] }).select(
-    "kind title content createdAt editedAt uploadStatus uploadError sourceFileName user_id"
+  const documents = await Document.find(anyRoleFilter(userId)).select(
+    "kind title content createdAt editedAt uploadStatus uploadError sourceFileName user_id users commenters viewers"
   ).lean();
   // Documents shared with this user carry the owner's name, so Home can say who shared them.
   const sharedOwnerIds = [...new Set(documents.filter(document => !isDocumentOwner(userId, document.user_id)).map(document => String(document.user_id)))];
@@ -107,15 +127,16 @@ export const getDocumentList = async (userId: string) => {
     visit(content);
     return words.join(" ").slice(0, 300);
   };
-  return documents.map(({ content, user_id, ...document }) => {
+  return documents.map(({ content, user_id, users, commenters, viewers, ...document }) => {
     const owned = isDocumentOwner(userId, user_id);
-    return { ...document, owned, ...(owned ? {} : { sharedBy: ownerLabel.get(String(user_id)) ?? "Someone" }), preview: previewText(content) };
+    const role = getDocumentRole(userId, { user_id, users, commenters, viewers });
+    return { ...document, owned, role, ...(owned ? {} : { sharedBy: ownerLabel.get(String(user_id)) ?? "Someone" }), preview: previewText(content) };
   });
 };
 
 export const searchDocuments = async (userId: string, query: string) => {
   const results: { _id: string; title: string; excerpt: string }[] = [];
-  const cursor = Document.find({ $or: [{ user_id: userId }, { users: userId }] }).select("title content").lean().cursor();
+  const cursor = Document.find(anyRoleFilter(userId)).select("title content").lean().cursor();
   for await (const document of cursor) {
     const excerpt = searchExcerpt(documentText(document.content), query);
     if (excerpt !== null || document.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())) {
@@ -142,6 +163,7 @@ export const getDocumentData = async (userId: string, fileId: string) => {
  */
 const saveTextDocument = async (userId: string, fileId: string, title: string, content: unknown, revision: number) => {
   const document = await getDocumentData(userId, fileId);
+  assertCanEdit(getDocumentRole(userId, document));
   if (document.kind === "presentation") throw new AppError(400, "Use presentation save");
   const saved = await Document.updateOne(
     {
@@ -149,6 +171,7 @@ const saveTextDocument = async (userId: string, fileId: string, title: string, c
         { _id: fileId },
         // Documents created before `revision` existed have no such field, which counts as 0.
         revision === 0 ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] } : { revision },
+        // Only the owner and editors match here, so a role downgrade between the check above and this write still loses.
         { $or: [{ user_id: userId }, { users: userId }] },
       ],
     },
@@ -163,6 +186,7 @@ export const updateDocument = (userId: string, fileId: string, title: string, ne
 
 export const savePresentation = async (userId: string, id: string, revision: number, pptx: string, title?: string) => {
   const document = await getDocumentData(userId, id);
+  assertCanEdit(getDocumentRole(userId, document));
   if (document.kind !== "presentation") throw new AppError(400, "Expected a presentation");
   const saved = await Document.updateOne({ _id: id, revision, $or: [{ user_id: userId }, { users: userId }] },
     { $set: { pptx, ...(title ? { title } : {}), editedAt: new Date() }, $inc: { revision: 1 } });
@@ -170,10 +194,15 @@ export const savePresentation = async (userId: string, id: string, revision: num
   return revision + 1;
 };
 
+const ROLE_FIELDS = { editor: "users", commenter: "commenters", viewer: "viewers" } as const;
+type ShareRole = keyof typeof ROLE_FIELDS;
+
+/** Adds a collaborator, or moves an existing one to a different role. Owner only. */
 export const addUserToDocument = async (
   ownerUserId: string,
   fileId: string,
-  userToAddMail: string
+  userToAddMail: string,
+  role: ShareRole = "editor"
 ) => {
   const userToAdd = await User.findOne({ email: userToAddMail });
   if (!userToAdd) {
@@ -184,10 +213,47 @@ export const addUserToDocument = async (
   if (!isDocumentOwner(ownerUserId, document.user_id)) {
     throw new AppError(403, "You are not authorized to update this document");
   }
+  const targetId = userToAdd._id.toString();
+  if (isDocumentOwner(targetId, document.user_id)) throw new AppError(400, "The owner already has full access");
 
-  await Document.findByIdAndUpdate(fileId, {
-    $addToSet: { users: userToAdd._id.toString() },
+  const otherFields = Object.entries(ROLE_FIELDS).filter(([name]) => name !== role).map(([, field]) => field);
+  await Document.updateOne({ _id: fileId }, {
+    $addToSet: { [ROLE_FIELDS[role]]: targetId },
+    $pull: Object.fromEntries(otherFields.map(field => [field, targetId])),
   });
+  documentAccessChanged(fileId);
+};
+
+/** Removes a collaborator from every role. The owner can remove anyone; collaborators can remove only themselves (leave). */
+export const removeUserFromDocument = async (requesterId: string, fileId: string, targetUserId: string) => {
+  const document = await findDocumentOrThrow(fileId);
+  const requesterIsOwner = isDocumentOwner(requesterId, document.user_id);
+  if (!requesterIsOwner && requesterId.toString() !== targetUserId) {
+    throw new AppError(403, "You are not authorized to update this document");
+  }
+  if (isDocumentOwner(targetUserId, document.user_id)) throw new AppError(400, "The owner cannot be removed");
+  await Document.updateOne({ _id: fileId }, { $pull: { users: targetUserId, commenters: targetUserId, viewers: targetUserId } });
+  documentAccessChanged(fileId);
+};
+
+/** Owner, then collaborators with their role. Owner only, since it exposes emails. */
+export const listDocumentMembers = async (requesterId: string, fileId: string) => {
+  const document = await findDocumentOrThrow(fileId);
+  if (!isDocumentOwner(requesterId, document.user_id)) throw new AppError(403, "You are not authorized to view this document's members");
+  const roles: Record<string, DocumentRole> = {};
+  for (const id of document.viewers ?? []) roles[id] = "viewer";
+  for (const id of document.commenters ?? []) roles[id] = "commenter";
+  for (const id of document.users ?? []) roles[id] = "editor";
+  const ownerId = String(document.user_id);
+  const ids = [ownerId, ...Object.keys(roles)];
+  const people = await User.find({ _id: { $in: ids } }).select("name email").lean();
+  const byId = new Map(people.map(person => [String(person._id), person]));
+  return ids.map(id => ({
+    userId: id,
+    email: byId.get(id)?.email ?? "Unknown user",
+    name: byId.get(id)?.name ?? null,
+    role: id === ownerId ? "owner" as const : roles[id],
+  }));
 };
 
 /** Earlier edit requests on this document, so "make it shorter" or "now the next section" keep their meaning. Optional context: any failure just means none. */
@@ -239,7 +305,8 @@ export const performDocumentAction = async (
 ) => {
   const document = await findDocumentOrThrow(documentId);
 
-  if (!isDocumentOwner(userId, document.user_id)) {
+  // Editors may use AI edits too; the requester, not the owner, is the one metered (see getOpenRouterKey).
+  if (!canEditRole(getDocumentRole(userId, document))) {
     throw new AppError(403, "Document not found");
   }
 
@@ -481,7 +548,7 @@ export const getDocumentChats = async (userId: string, documentId: string) => {
 
 export const saveActionHistory = async (userId: string, documentId: string, prompt: string, response: string) => {
   const document = await findDocumentOrThrow(documentId);
-  if (!isDocumentOwner(userId, document.user_id)) throw new AppError(403, "Document not found");
+  if (!canEditRole(getDocumentRole(userId, document))) throw new AppError(403, "Document not found");
   return Chat.create({ documentId, prompt, response });
 };
 
@@ -504,7 +571,7 @@ export const createDocumentImageSignature = async (
   documentId: string,
   originalName: string
 ) => {
-  await getDocumentData(userId, documentId);
+  assertCanEdit(getDocumentRole(userId, await getDocumentData(userId, documentId)));
   assertCloudinaryConfigured();
 
   const timestamp = Math.floor(Date.now() / 1000);
@@ -544,6 +611,7 @@ export const registerDocumentImage = async (
   }
 ) => {
   const document = await getDocumentData(userId, documentId);
+  assertCanEdit(getDocumentRole(userId, document));
   const expectedPrefix = `documents/${documentId}/`;
 
   if (!image.publicId.startsWith(expectedPrefix)) {

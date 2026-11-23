@@ -43,7 +43,12 @@ const Editor = ({ onEditorReady }: EditorProps) => {
     queryKey: ["document", id],
     enabled: !!user && !!id,
     queryFn: async (): Promise<DocumentDTO> => {
-      const synced = await syncData(id);
+      // An offline copy is only pushed when the user may still edit; after access was lost it stays on this device.
+      const synced = await syncData(id).catch((error) => {
+        const status = (error as { response?: { status?: number } })?.response?.status;
+        if (status === 403 || status === 404) return true as const;
+        throw error;
+      });
 
       const doc = await fetchDocumentData(id);
 
@@ -128,10 +133,12 @@ const Editor = ({ onEditorReady }: EditorProps) => {
   if (!user) return <p>User not logged in</p>;
   if (error) return <p>Failed to load document</p>;
   if (!data) return <p>No document data</p>;
-  if (data.kind === "presentation") return <Suspense fallback={<EditorSkeleton />}><PresentationEditor key={id} id={id} title={data.title} pptx={data.pptx} revision={data.revision ?? 0} /></Suspense>;
+  // Documents from before roles existed come back without one; the server still rejects writes from non-editors.
+  const readOnly = !!data.role && data.role !== "owner" && data.role !== "editor";
+  if (data.kind === "presentation") return <Suspense fallback={<EditorSkeleton />}><PresentationEditor key={id} id={id} title={data.title} pptx={data.pptx} revision={data.revision ?? 0} readOnly={readOnly} /></Suspense>;
   return (
     <div className="Editor flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
-      {data.offlineConflict && (
+      {data.offlineConflict && !readOnly && (
         <div role="alert" className="m-2 flex flex-wrap items-center gap-2 rounded border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
           <p className="min-w-0 flex-1">
             Edits made offline (“{data.offlineConflict.title}”) could not be merged because this document changed on the server. Nothing has been overwritten.
@@ -140,7 +147,7 @@ const Editor = ({ onEditorReady }: EditorProps) => {
           <button type="button" className="rounded border px-3 py-1 hover:bg-muted" onClick={() => resolveOfflineConflict(false)}>Keep the server version</button>
         </div>
       )}
-      <SimpleEditor key={`${id}:${editorKey}`} title={data.title} content={data.content} onEditorReady={onEditorReady} updateDocument={updateDocument} />
+      <SimpleEditor key={`${id}:${editorKey}`} title={data.title} content={data.content} onEditorReady={onEditorReady} updateDocument={updateDocument} role={data.role} />
     </div>
   );
 };

@@ -10,6 +10,9 @@ import {
   createDocument,
   getDocumentChats,
   getDocumentData,
+  getDocumentRole,
+  listDocumentMembers,
+  removeUserFromDocument,
   getDocumentList,
   searchDocuments,
   getTestDocument,
@@ -31,6 +34,7 @@ import {
   documentActionBodySchema,
   documentActionParamsSchema,
   documentIdBodySchema,
+  removeUserParamsSchema,
   getChatsParamsSchema,
   registerDocumentImageSchema,
   syncDocumentSchema,
@@ -100,7 +104,7 @@ const getDocumentDataHandler = async (req: Request, res: Response) => {
     const userId = requireAuthenticatedUser(req);
     const { file_id } = documentIdBodySchema.parse(req.body);
     const document = await getDocumentData(userId, file_id);
-    res.status(200).send(document);
+    res.status(200).send({ ...document.toJSON(), role: getDocumentRole(userId, document) });
   } catch (error) {
     handleControllerError(res, error);
   }
@@ -120,9 +124,9 @@ const updateDocumentHandler = async (req: Request, res: Response) => {
 const addUserHandler = async (req: Request, res: Response) => {
   try {
     const userId = requireAuthenticatedUser(req);
-    const { file_id, userToAddMail } = addUserSchema.parse(req.body);
-    await addUserToDocument(userId, file_id, userToAddMail);
-    res.status(200).send("users added to view document...");
+    const { file_id, userToAddMail, role } = addUserSchema.parse(req.body);
+    await addUserToDocument(userId, file_id, userToAddMail, role);
+    res.status(200).send(`user added as ${role}`);
   } catch (error) {
     handleControllerError(res, error);
   }
@@ -222,6 +226,25 @@ const registerDocumentImageHandler = async (req: Request, res: Response) => {
   }
 };
 
+const removeUserHandler = async (req: Request, res: Response) => {
+  try {
+    const { documentId, userId: targetUserId } = removeUserParamsSchema.parse(req.params);
+    await removeUserFromDocument(requireAuthenticatedUser(req), documentId, targetUserId);
+    res.status(200).json({ message: "user removed" });
+  } catch (error) {
+    handleControllerError(res, error);
+  }
+};
+
+const listMembersHandler = async (req: Request, res: Response) => {
+  try {
+    const { documentId } = documentActionParamsSchema.parse(req.params);
+    res.status(200).json({ members: await listDocumentMembers(requireAuthenticatedUser(req), documentId) });
+  } catch (error) {
+    handleControllerError(res, error);
+  }
+};
+
 export const registerDocumentRoutes = (router: Router) => {
   router.get("/getDoc", getDocHandler);
   const presentationUpload = multer({ limits: { fileSize: 6 * 1024 * 1024, files: 1, fields: 0 } }).single("file");
@@ -253,6 +276,8 @@ export const registerDocumentRoutes = (router: Router) => {
   router.post("/documentData", firebaseTokenVerify, getDocumentDataHandler);
   router.post("/documentUpdate", firebaseTokenVerify, updateDocumentHandler);
   router.post("/adduser", firebaseTokenVerify, addUserHandler);
+  router.get("/:documentId/members", firebaseTokenVerify, listMembersHandler);
+  router.delete("/:documentId/users/:userId", firebaseTokenVerify, removeUserHandler);
   router.post(
     "/actions/:documentId",
     firebaseTokenVerify,

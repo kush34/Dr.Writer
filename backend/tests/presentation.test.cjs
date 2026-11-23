@@ -14,7 +14,7 @@ test("presentation actions and saves enforce document access, kind, and revision
   assert.equal(createDocumentSchema.parse({ title: "Legacy" }).kind, "document");
   assert.ok(savePresentationSchema.safeParse({ pptx, revision: 0 }).success);
   assert.equal(savePresentationSchema.parse({ pptx, revision: 0, title: "Renamed deck" }).title, "Renamed deck");
-  const doc = { kind: "presentation", revision: 0, user_id: "owner", users: ["member"] };
+  const doc = { kind: "presentation", revision: 0, user_id: "owner", users: ["member"], viewers: ["viewer"] };
   t.mock.method(Document, "create", async properties => properties);
   assert.equal((await createDocument("owner", "Slides", "presentation")).kind, "presentation");
   t.mock.method(Document, "findById", async () => doc);
@@ -35,8 +35,11 @@ test("presentation actions and saves enforce document access, kind, and revision
     return JSON.stringify({ operations: plan });
   });
   const edit = user => performDocumentAction(user, "deck", "Add overview", undefined, "selected-model", [["First slide"]]);
-  await assert.rejects(edit("member"), { statusCode: 403 });
+  // Viewers and outsiders cannot run AI edits; editors (the `users` list) can since roles exist.
+  await assert.rejects(edit("viewer"), { statusCode: 403 });
+  await assert.rejects(edit("outsider"), { statusCode: 403 });
   assert.equal(model.mock.callCount(), 0);
+  assert.deepEqual((await edit("member")).operations, plan);
   assert.deepEqual((await edit("owner")).operations, plan);
   model.mock.mockImplementation(async () => '{"operations":[{"type":"unknown"}]}');
   await assert.rejects(edit("owner"), { statusCode: 502 });
