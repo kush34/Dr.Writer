@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import Login from '@/components/Login'
 import Register from '@/components/Register'
 import AppLayout from './AppLayout'
-import { Analytics } from "@vercel/analytics/react"
 
 const App = () => {
   const [flag, setFlag] = useState<boolean>(true)
@@ -12,7 +11,6 @@ const App = () => {
 
   return (
     <AppLayout>
-      <Analytics />
       <div className='flex w-full h-screen'>
         <div className='hidden xl:inline xl:w-1/2 h-full bg-[#e6fdec] text-black'>
           <div className='w-full h-full flex flex-col justify-center items-center'>

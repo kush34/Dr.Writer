@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UserContextProvider } from './context/UserContext';
 import { CommandSearch } from './components/CommandSearch';
+import { Analytics } from "@vercel/analytics/react";
 import { PageSkeleton } from './components/PageSkeleton';
 
 // Lazy imports
@@ -50,6 +51,15 @@ if (root) {
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <QueryClientProvider client={queryClient}>
             <RouterProvider router={router} />
+            <Analytics beforeSend={(event) => {
+              const url = new URL(event.url);
+              if (!['/', '/login', '/home', '/settings'].includes(url.pathname)) return null;
+              const source = url.searchParams.get('utm_source');
+              url.search = '';
+              if (source === 'chatgpt.com') url.searchParams.set('utm_source', source);
+              url.hash = '';
+              return { ...event, url: url.toString() };
+            }} />
       </QueryClientProvider >
     </ThemeProvider>
   );
