@@ -36,7 +36,8 @@ const UserContextProvider = ({ children }: { children: ReactNode }) => {
                 });
             } else {
                 setUser(null);
-                navigate("/")
+                // Only protected pages bounce signed-out visitors; the landing and login pages are public.
+                if (!["/", "/login"].includes(window.location.pathname)) navigate("/");
             }
             setLoading(false); // Stop loading when user data is fetched
         });
