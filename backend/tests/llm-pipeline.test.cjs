@@ -152,3 +152,35 @@ test('markdown edit operations are applied and locked blocks are protected', asy
   assert.equal(calls, 2);
   assert.deepEqual(result.updatedContent.content.map(n => n.type), ['image', 'heading', 'paragraph', 'bulletList']);
 });
+
+test('lint catches placeholder and wall-of-text output and cleans bullet glyphs', () => {
+  const { lintSlides, lintDocumentOps, cleanSlides } = require('../dist/utils/lintEdits');
+  const cleaned = cleanSlides([{ type: 'append', title: 'A', bullets: ['• One', '- Two', '3. Three'], body: '• x\n• y' }]);
+  assert.deepEqual(cleaned[0].bullets, ['One', 'Two', 'Three']);
+  assert.equal(cleaned[0].body, 'x\ny');
+  assert.deepEqual(lintSlides(cleaned), []);
+  assert.equal(lintSlides([{ type: 'append', title: 'A', bullets: ['Lorem ipsum dolor'] }, { type: 'append', title: 'a', bullets: ['ok'] }]).length, 2);
+  assert.equal(lintSlides([{ type: 'append', title: 'A', bullets: Array(7).fill('Short point') }]).length, 1);
+  assert.deepEqual(lintDocumentOps([{ type: 'insert', markdown: '## Heading\n\nReal text with [a link](https://x.com).' }, { type: 'delete' }]), []);
+  assert.equal(lintDocumentOps([{ type: 'insert', markdown: '   ' }]).length, 1);
+  assert.equal(lintDocumentOps([{ type: 'insert', markdown: 'Sure, here is the text:\n\nHello' }]).length, 1);
+  assert.equal(lintDocumentOps([{ type: 'insert', markdown: '```markdown\n# Hi\n```' }]).length, 1);
+  assert.deepEqual(lintDocumentOps([{ type: 'insert', markdown: '```js\nconst a = 1;\n```' }]), []);
+});
+
+test('placeholder output is sent back to the model and corrected on retry', async t => {
+  const Document = require('../dist/Models/documentModel').default;
+  const auth = require('../dist/service/openrouterAuth');
+  const router = require('../dist/service/openrouter');
+  const { performDocumentAction } = require('../dist/Services/documentService');
+  const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original' }] }] };
+  t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', content }));
+  t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  const prompts = [];
+  const replies = ['{"operations":[{"type":"insert","at":1,"markdown":"Lorem ipsum dolor sit amet"}]}', '{"operations":[{"type":"insert","at":1,"markdown":"A real sentence."}]}'];
+  t.mock.method(router, 'openRouterComplete', async prompt => { prompts.push(prompt); return replies.shift(); });
+  const result = await performDocumentAction('owner', 'doc', 'add text', content, 'model');
+  assert.equal(result.operations[0].markdown, 'A real sentence.');
+  assert.equal(prompts.length, 2);
+  assert.ok(prompts[1].includes('placeholder or chatty text'));
+});
