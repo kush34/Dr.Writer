@@ -1,11 +1,32 @@
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
+export default defineConfig(({ mode }) => {
+  const siteUrl = loadEnv(mode, process.cwd(), "").SITE_URL;
+  let origin: string | undefined;
+  if (siteUrl) {
+    const url = new URL(siteUrl);
+    if (!["http:", "https:"].includes(url.protocol) || url.pathname !== "/" || url.search || url.hash || url.username || url.password) {
+      throw new Error("SITE_URL must be an HTTP(S) origin, such as https://example.com");
+    }
+    origin = url.origin;
+  }
+  return {
+  plugins: [react(), tailwindcss(), {
+    name: "public-seo",
+    transformIndexHtml(html) {
+      if (!origin) return html;
+      return html.replace("</head>", `  <link rel="canonical" href="${origin}/" />\n    <meta property="og:url" content="${origin}/" />\n    <meta property="og:image" content="${origin}/editor-hero.png" />\n  </head>`);
+    },
+    generateBundle() {
+      if (!origin) return;
+      this.emitFile({ type: "asset", fileName: "sitemap.xml", source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${origin}/</loc></url></urlset>\n` });
+      this.emitFile({ type: "asset", fileName: "robots.txt", source: `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n` });
+    },
+  }],
   optimizeDeps: { esbuildOptions: { target: "es2022" }, include: ["docx"] },
   resolve: {
     alias: {
@@ -55,4 +76,5 @@ export default defineConfig({
       },
     },
   },
+  }
 })

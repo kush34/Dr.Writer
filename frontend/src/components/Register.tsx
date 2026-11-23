@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { track } from '@vercel/analytics'
 import { createUser } from '../firebaseAuth/firebaseConfig';
 import { Description } from '@radix-ui/react-toast';
 import { Loader } from 'lucide-react';
@@ -21,6 +22,7 @@ const Register = ({ setFlag }: { setFlag: React.Dispatch<React.SetStateAction<bo
         return;
       }
 
+      track("Email signup");
       toast.success("Account created successfully!");
     } catch (err) {
       console.error("Unexpected error:", err);

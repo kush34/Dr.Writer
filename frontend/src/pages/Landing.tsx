@@ -181,7 +181,6 @@ const Landing = () => {
   const navigate = useNavigate();
   const [activeMode, setActiveMode] = useState(workspaceModes[0].id);
   const [assistantLayout, setAssistantLayout] = useState<"side" | "dock">("side");
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const whyRef = useRef<HTMLElement | null>(null);
   const useCasesRef = useRef<HTMLElement | null>(null);
@@ -388,24 +387,14 @@ const Landing = () => {
               Start before the document chaos starts.
             </h2>
             <div className="mt-8 space-y-3">
-              {faqs.map((faq, index) => (
-                <button
-                  key={faq.question}
-                  onClick={() => setOpenFaq((current) => (current === index ? null : index))}
-                  className="w-full rounded-[1.5rem] border border-black/8 bg-white px-5 py-4 text-left shadow-sm"
-                >
-                  <div className="flex items-center justify-between gap-6">
-                    <span className="text-sm font-medium text-slate-900 sm:text-base">{faq.question}</span>
-                    <ChevronDown
-                      className={`h-4 w-4 shrink-0 text-slate-500 transition ${
-                        openFaq === index ? "rotate-180" : ""
-                      }`}
-                    />
-                  </div>
-                  {openFaq === index && (
-                    <p className="pt-3 text-sm leading-6 text-slate-600">{faq.answer}</p>
-                  )}
-                </button>
+              {faqs.map((faq) => (
+                <details key={faq.question} className="group w-full rounded-[1.5rem] border border-black/8 bg-white px-5 py-4 text-left shadow-sm">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-sm font-medium text-slate-900 sm:text-base">
+                    {faq.question}
+                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-180" />
+                  </summary>
+                  <p className="pt-3 text-sm leading-6 text-slate-600">{faq.answer}</p>
+                </details>
               ))}
             </div>
           </div>
