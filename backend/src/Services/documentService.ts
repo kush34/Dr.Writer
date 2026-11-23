@@ -1,5 +1,6 @@
 import { ZodError, type z } from "zod";
 import { getOpenRouterKey } from "../service/openrouterAuth";
+import { assertClean, cleanSlides, lintDocumentOps, lintSlides } from "../utils/lintEdits";
 import { presentationPlan, presentationDeck } from "../validation/documentSchemas";
 import { Response } from "express";
 import { documentText, searchExcerpt } from "../utils/documentSearch";
@@ -245,7 +246,8 @@ The presentation has ${outline.length} existing slide(s), valid indexes 0..${out
 ${deck ? `Slide size is ${deck.width}x${deck.height} points. Available layouts: ${deck.layouts.map(layout => `${layout.name} (${layout.type})`).join(", ")}. Slides and their shapes: ${JSON.stringify(deck.slides)}\n` : ""}Example: {"operations":[{"type":"append","layout":"title","title":"Q3 Plan","body":"Priorities and budget"},{"type":"append","title":"Priorities","bullets":["Ship the editor","Cut load time in half","Hire two engineers"]}]}
 Outline: ${JSON.stringify(outline)}
 Request: ${command}${plan}`, value => {
-        const ops = presentationPlan.parse(value?.operations);
+        const ops = cleanSlides(presentationPlan.parse(value?.operations));
+        assertClean(lintSlides(ops));
         if (ops.some(op => op.type !== "append" && (op.slide >= outline.length || (op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))))) throw new Error("Slide or shape index is invalid");
         return ops;
       });
@@ -290,6 +292,7 @@ ${documentMarkdown || "(empty)"}
 Command: ${command}${documentPlan}`, value => {
       if (typeof value?.question === "string" && value.question.trim() && (!value.operations || (Array.isArray(value.operations) && !value.operations.length))) return { question: value.question.trim(), operations: [] };
       const ops = validateDocumentOperations(value?.operations, blockCount);
+      assertClean(lintDocumentOps(ops));
       for (const op of ops) if (op.type !== "insert") for (let i = op.from; i <= op.to; i++) if (locked.has(i)) throw new Error(`Block ${i} is not editable and cannot be replaced or deleted`);
       return { operations: ops };
     });
