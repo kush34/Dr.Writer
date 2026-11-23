@@ -4,9 +4,9 @@ import {
   Bold, Italic, List, Link2, Undo2, Redo2, Download, Save, PanelLeftClose, SendHorizontal,
   ChevronDown,
   FileText,
-  Lock,
   MessageSquareMore,
   Sparkles,
+  Presentation, Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import "./landing-models.css";
@@ -103,55 +103,6 @@ const audiences = [
   "Collaborators",
 ];
 
-const workspaceModes = [
-  {
-    id: "writers",
-    label: "Writers",
-    title: "Start faster and stay in the draft",
-    description:
-      "From first outline to final revision, Dr.Writer keeps writing, formatting, and AI support in the same workspace.",
-    cards: [
-      {
-        title: "Create documents",
-        description: "Spin up a fresh draft, upload an existing file, and keep your work organized.",
-        image: "/doc-landing.webp",
-        height: 667,
-        tint: "from-[#fff4d9] via-white to-[#fffdf6]",
-      },
-      {
-        title: "Edit with AI support",
-        description: "Improve tone, clarity, and structure while you write instead of after the fact.",
-        image: "/support-landing.webp",
-        height: 1000,
-        tint: "from-[#e9fff4] via-white to-[#f8fffc]",
-      },
-    ],
-  },
-  {
-    id: "teams",
-    label: "Teams",
-    title: "Collaborate without version chaos",
-    description:
-      "Live edits, shared access, and synced updates help teams move through reviews without losing context.",
-    cards: [
-      {
-        title: "Live collaboration",
-        description: "Work in the same document together and watch updates land in real time.",
-        image: "/collab-landing.webp",
-        height: 667,
-        tint: "from-[#efe9ff] via-white to-[#fbf9ff]",
-      },
-      {
-        title: "Cloud and offline flow",
-        description: "Stay productive online or offline, then sync when you are back.",
-        image: "/offline-landing.webp",
-        height: 1000,
-        tint: "from-[#ffecea] via-white to-[#fff8f7]",
-      },
-    ],
-  },
-];
-
 const faqs = [
   {
     question: "What makes Dr.Writer different from a basic document editor?",
@@ -181,7 +132,9 @@ const faqs = [
 ];
 
 const Landing = () => {
-  const [activeMode, setActiveMode] = useState(workspaceModes[0].id);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [presentationPrompt, setPresentationPrompt] = useState("");
+  const [previewPrompt, setPreviewPrompt] = useState("");
   const [assistantLayout, setAssistantLayout] = useState<"side" | "dock">("side");
   const [navHidden, setNavHidden] = useState(false);
 
@@ -201,7 +154,6 @@ const Landing = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const activeWorkspace = workspaceModes.find((mode) => mode.id === activeMode) ?? workspaceModes[0];
 
   return (
     <div className="min-h-screen bg-white text-slate-950 [font-family:'Plus_Jakarta_Sans',ui-sans-serif,system-ui,sans-serif]">
@@ -212,7 +164,7 @@ const Landing = () => {
           </button>
           <nav className="hidden items-center gap-8 text-sm text-slate-700 md:flex">
             <a href="#features">Why choose us</a>
-            <a href="#workspace">Workspace flow</a>
+            <a href="#presentations">Presentations</a>
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQs</a>
           </nav>
@@ -296,65 +248,30 @@ const Landing = () => {
           </div>
         </section>
 
-        {/* Workspace modes */}
-        <section id="workspace" className="mx-auto max-w-[1320px] px-5 py-20 sm:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-              We built the hard part so your writing flow feels easy
-            </h2>
-            <p className="mt-4 text-base leading-7 text-slate-600">
-              Whether you are drafting alone or reviewing with a team, every essential step stays
-              inside one workspace.
-            </p>
+        <section id="presentations" className="mx-auto max-w-[1320px] px-5 py-20 sm:px-8 sm:py-28">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">Your ideas deserve a bigger stage.</h2>
+            <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">Create and refine presentations alongside the rest of your work, with AI ready to help.</p>
           </div>
-
-          <div className="mt-8 flex justify-center gap-2 rounded-full bg-[#f3f3f3] p-1 w-fit mx-auto">
-            {workspaceModes.map((mode) => (
-              <button
-                key={mode.id}
-                onClick={() => setActiveMode(mode.id)}
-                className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                  activeMode === mode.id ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
-                }`}
-              >
-                {mode.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            {activeWorkspace.cards.map((card) => (
-              <article
-                key={card.title}
-                className={`overflow-hidden rounded-[2rem] border border-black/8 bg-gradient-to-br ${card.tint} p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)]`}
-              >
-                <div className="max-w-sm">
-                  <h3 className="text-2xl font-semibold tracking-tight">{card.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{card.description}</p>
-                </div>
-                <div className="mt-8 overflow-hidden rounded-[1.5rem] border border-white/70 bg-white/80">
-                  <img src={card.image} alt="" width={1000} height={card.height} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="mt-8 rounded-[2rem] border border-black/8 bg-white p-7 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
-            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-              <div>
-                <h3 className="text-2xl font-semibold tracking-tight">{activeWorkspace.title}</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                  {activeWorkspace.description}
-                </p>
+          <div className="mx-auto mt-20 max-w-[1256px] overflow-hidden rounded-[28px] border border-black/10 bg-[#f7f7f5] shadow-[0_24px_70px_rgba(15,23,42,0.1)]">
+            <div className="flex items-center gap-2 border-b border-black/5 bg-white px-5 py-4 text-sm text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-[#ff7770]"/><span className="h-2.5 w-2.5 rounded-full bg-[#f4c15d]"/><span className="h-2.5 w-2.5 rounded-full bg-[#75c98b]"/><span className="mx-auto pr-10 font-medium text-slate-700">The next chapter.pptx</span></div>
+            <div className="grid min-h-[660px] grid-cols-[68px_1fr] sm:grid-cols-[150px_1fr] lg:grid-cols-[150px_1fr_320px]">
+              <div className="space-y-4 border-r border-black/5 p-3 sm:p-5">
+                {["The next chapter", "A clearer direction", "What comes next"].map((title, i) => <button type="button" key={title} onClick={() => setActiveSlide(i)} aria-label={`Show slide ${i + 1}: ${title}`} aria-pressed={activeSlide === i} className={`block aspect-[4/3] w-full rounded-md border bg-white p-2 text-left text-[7px] font-semibold text-slate-700 sm:text-[9px] ${i === activeSlide ? "ring-2 ring-slate-900" : "opacity-60 hover:opacity-100"}`}><span className="mb-2 block text-[7px] text-slate-400">0{i + 1}</span>{title}</button>)}
               </div>
-              <Button
-                asChild
-                variant="outline"
-                className="rounded-full px-5"
-              >
-                <a href="/login">Open Dr.Writer <ArrowRight className="h-4 w-4" /></a>
-              </Button>
+              <div className="flex items-center justify-center p-4 sm:p-10"><div className="flex aspect-[16/9] w-full max-w-2xl flex-col justify-between bg-[#f0ede5] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.12)] sm:p-10"><span className="text-[8px] font-semibold uppercase tracking-[0.2em] text-slate-500 sm:text-xs">A new perspective</span><div><div className="h-1 w-10 bg-[#df795f] sm:w-16"/><p className="mt-3 max-w-md text-xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">{["The next chapter starts with an idea.", "A clearer direction for what comes next.", "Let’s make the next move count."][activeSlide]}</p></div><span className="text-[8px] text-slate-500 sm:text-xs">A presentation made in Dr.Writer</span></div></div>
+              <div className="col-span-2 flex min-h-[400px] flex-col border-t border-black/5 bg-white p-5 lg:col-span-1 lg:border-l lg:border-t-0">
+                <div className="flex items-center gap-2 border-b border-black/5 pb-4 text-sm font-semibold"><Sparkles size={16}/> Dr.Writer <span className="ml-auto text-xs font-normal text-slate-500">AI assistant</span></div>
+                <div className="flex-1 space-y-4 py-6 text-sm leading-6 text-slate-600"><p className="text-xs font-medium uppercase tracking-wider text-slate-400">Today</p><div className="rounded-2xl bg-slate-100 p-4 text-slate-700">Make the opening slide more concise and keep the tone optimistic.</div><div><p className="font-semibold text-slate-900">Let’s bring the idea forward.</p><p className="mt-2">I’ve suggested a shorter opening that keeps your message clear and positive.</p></div><div className="rounded-xl border border-black/10 p-4"><p className="text-xs font-semibold text-slate-500">SUGGESTED EDIT · SLIDE 1</p><p className="mt-2 font-medium text-slate-800">The next chapter starts with an idea.</p><p className="mt-2 text-xs text-slate-500">Review edits in the workspace before applying.</p></div>{previewPrompt && <><div className="rounded-2xl bg-slate-100 p-4 text-slate-700">{previewPrompt}</div><p className="text-xs text-slate-500">This is a preview. Open Dr.Writer to ask the assistant about your presentation.</p></>}</div>
+                <form className="border-t border-black/5 pt-4" onSubmit={event => { event.preventDefault(); if (presentationPrompt.trim()) { setPreviewPrompt(presentationPrompt.trim()); setPresentationPrompt(""); } }}><div className="mb-3 flex items-center justify-between text-xs text-slate-500"><span>Discuss &nbsp; / &nbsp; Edit</span><span>AI assistant</span></div><div className="flex items-center gap-2 rounded-lg border border-black/10 px-3 py-2"><input aria-label="Ask about your presentation" value={presentationPrompt} onChange={event => setPresentationPrompt(event.target.value)} placeholder="Ask about your slides…" className="min-w-0 flex-1 bg-transparent text-sm outline-none"/><button type="submit" aria-label="Send preview message" className="rounded-md p-2 text-slate-800 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2"><SendHorizontal size={16}/></button></div><p className="mt-2 text-xs text-slate-500">Interactive preview · Open your workspace to use AI</p></form>
+              </div>
             </div>
+          </div>
+          <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {[[Presentation, "Create your deck", "Start a new presentation in your workspace."], [Upload, "Bring your slides", "Upload an existing PowerPoint file to keep working."], [Sparkles, "Refine with AI", "Ask for slide edits and review suggestions before applying them."], [Download, "Take it with you", "Download your presentation as a PPTX file."]].map(([Icon, title, description]) => {
+              const FeatureIcon = Icon as typeof Presentation;
+              return <div key={title as string} className="border-t border-black/10 pt-6"><FeatureIcon className="h-6 w-6" strokeWidth={1.7}/><h3 className="mt-5 text-lg font-semibold">{title as string}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{description as string}</p></div>;
+            })}
           </div>
         </section>
 
@@ -387,67 +304,28 @@ const Landing = () => {
           </div>
         </section>
 
-        {/* FAQ + CTA card */}
+        {/* FAQ */}
         <section
           id="faq"
-          className="mx-auto grid max-w-[1320px] gap-10 px-5 py-20 sm:px-8 lg:grid-cols-[0.95fr_0.85fr]"
+          className="mx-auto grid max-w-[1256px] gap-10 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20"
         >
           <div>
             <h2 className="max-w-md text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">
-              Start before the document chaos starts.
+              Questions, answered.
             </h2>
-            <div className="mt-8 space-y-3">
+            <p className="mt-5 max-w-sm text-base leading-7 text-slate-600">A little more about writing, editing, and working together in Dr.Writer.</p>
+          </div>
+            <div className="border-t border-black/10">
               {faqs.map((faq) => (
-                <details key={faq.question} className="group w-full rounded-[1.5rem] border border-black/8 bg-white px-5 py-4 text-left shadow-sm">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-sm font-medium text-slate-900 sm:text-base">
+                <details key={faq.question} className="group w-full border-b border-black/10 py-6 text-left">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-base font-medium text-slate-900 [&::-webkit-details-marker]:hidden">
                     {faq.question}
                     <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-180" />
                   </summary>
-                  <p className="pt-3 text-sm leading-6 text-slate-600">{faq.answer}</p>
+                  <p className="max-w-2xl pt-4 text-sm leading-6 text-slate-600">{faq.answer}</p>
                 </details>
               ))}
             </div>
-          </div>
-
-          {/* Workspace CTA */}
-          <div className="rounded-[2rem] border border-black/10 bg-[#f3f3f3] p-[1px] shadow-[0_25px_70px_rgba(15,23,42,0.1)]">
-            <div className="rounded-[2rem] bg-white p-8">
-              <div className="text-center">
-                <p className="text-sm font-medium text-slate-500">Everything your workspace needs</p>
-                <h3 className="mt-3 text-3xl font-semibold tracking-tight">
-                  Move from first draft to shared final version
-                </h3>
-              </div>
-
-              <div className="mt-8 space-y-3">
-                <div className="rounded-2xl border border-black/8 bg-[#f7f7f7] p-4">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-slate-800" />
-                    <span className="text-sm font-medium">Document creation and uploads</span>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-black/8 bg-[#f7f7f7] p-4">
-                  <div className="flex items-center gap-3">
-                    <MessageSquareMore className="h-5 w-5 text-slate-800" />
-                    <span className="text-sm font-medium">Collaboration, sharing, and live updates</span>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-black/8 bg-[#f7f7f7] p-4">
-                  <div className="flex items-center gap-3">
-                    <Lock className="h-5 w-5 text-slate-800" />
-                    <span className="text-sm font-medium">Cloud access for your document workflow</span>
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                asChild
-                className="mt-6 h-12 w-full rounded-full bg-slate-950 text-white hover:bg-slate-800"
-              >
-                <a href="/login">Continue to workspace</a>
-              </Button>
-            </div>
-          </div>
         </section>
 
         {/* Bottom CTA banner */}
@@ -487,8 +365,8 @@ const Landing = () => {
               <a href="#features" className="block transition hover:text-slate-900">
                 Why Dr.Writer
               </a>
-              <a href="#workspace" className="block transition hover:text-slate-900">
-                Workspace flow
+              <a href="#presentations" className="block transition hover:text-slate-900">
+                Presentations
               </a>
               <a href="#faq" className="block transition hover:text-slate-900">
                 FAQs
@@ -511,6 +389,7 @@ const Landing = () => {
             </div>
           </div>
         </div>
+        <div aria-hidden="true" className="mx-auto overflow-hidden px-5 pt-6 text-center text-[clamp(3.5rem,13vw,12rem)] font-bold leading-[0.85] tracking-[-0.065em] text-transparent sm:px-8" style={{ backgroundImage: "linear-gradient(to bottom, #d9d9d9, transparent 90%)", backgroundClip: "text", WebkitBackgroundClip: "text" }}>Dr.Writer</div>
       </footer>
     </div>
   );
