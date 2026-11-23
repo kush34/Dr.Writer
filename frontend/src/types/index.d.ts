@@ -25,5 +25,6 @@ export type DocumentDTO = {
   title: string;
   content: JSONContent;
   relatedImages?: RelatedImageDTO[];
+  tags?: string[];
   updatedAt?: string;
 };

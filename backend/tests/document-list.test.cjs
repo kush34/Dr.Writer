@@ -45,3 +45,11 @@ test("owner lookup is skipped when nothing is shared", async t => {
   assert.equal(list.length, 1);
   assert.equal(lookup.mock.callCount(), 0);
 });
+
+test("Home list carries each document's tags and asks the database for them", async t => {
+  let selected = "";
+  t.mock.method(Document, "find", () => ({ select: fields => { selected = fields; return { lean: async () => [{ _id: "mine", title: "Mine", content: "", user_id: "me", users: [], tags: ["work", "q3"] }] }; } }));
+  const [item] = await getDocumentList("me");
+  assert.deepEqual(item.tags, ["work", "q3"]);
+  assert.match(selected, /\btags\b/);
+});

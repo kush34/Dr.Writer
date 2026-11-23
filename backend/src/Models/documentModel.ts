@@ -57,6 +57,8 @@ const documentSchema = new mongoose.Schema({
     users: [String],
     commenters: [String],
     viewers: [String],
+    // Free-form labels set by the owner or editors; used to filter the Home list.
+    tags: { type: [String], default: [] },
     relatedImages: {
         type: [relatedImageSchema],
         default: [],

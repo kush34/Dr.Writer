@@ -6,6 +6,7 @@ import FileCard, { tFile } from "./FileCard";
 import { Button } from "@/components/ui/button";
 import { FileListSkeleton } from "@/components/PageSkeleton";
 import { useUser } from "@/context/UserContext";
+import { collectTags, filterByTag } from "@/service/tags";
 
 export default function Files() {
   const { user, loading } = useUser();
@@ -18,7 +19,12 @@ export default function Files() {
   const allFiles: tFile[] = data?.documents ?? [];
   // Optimistic pending files have no `owned` flag yet; they are always the user's own.
   const sharedCount = allFiles.filter((file) => file.owned === false).length;
-  const files = scope === "all" ? allFiles : allFiles.filter((file) => (file.owned === false) === (scope === "shared"));
+  const [tag, setTag] = useState<string | null>(null);
+  const scoped = scope === "all" ? allFiles : allFiles.filter((file) => (file.owned === false) === (scope === "shared"));
+  const tags = collectTags(allFiles);
+  // A tag that no document has any more (deleted or untagged) must not leave the list silently empty.
+  const activeTag = tag !== null && tags.some((candidate) => candidate.toLocaleLowerCase() === tag.toLocaleLowerCase()) ? tag : null;
+  const files = filterByTag(scoped, activeTag);
   const changeView = (next: "card" | "list") => { setView(next); localStorage.setItem("drwriter.fileView", next); };
   return <div className="space-y-5 p-4">
     <div className="flex items-center justify-between gap-4"><div><h1 className="text-xl font-semibold">Documents</h1>{isLoading ? <div className="mt-2 h-3 w-16 animate-pulse rounded-md bg-muted motion-reduce:animate-none" /> : <p className="text-sm text-muted-foreground">{files.length} {files.length === 1 ? "file" : "files"}</p>}</div>
@@ -31,6 +37,10 @@ export default function Files() {
       {([["all", "All"], ["mine", "Mine"], ["shared", `Shared with me${sharedCount ? ` (${sharedCount})` : ""}`]] as const).map(([value, label]) =>
         <Button key={value} type="button" size="sm" variant={scope === value ? "secondary" : "ghost"} aria-pressed={scope === value} onClick={() => setScope(value)}>{label}</Button>)}
     </div>
-    {isLoading ? <FileListSkeleton view={view} /> : error ? <p role="alert">Could not load documents.</p> : files.length === 0 ? <p className="text-muted-foreground">{scope === "shared" ? "Nothing has been shared with you yet." : scope === "mine" ? "You haven't created any documents yet." : "No documents yet."}</p> : <div className={view === "card" ? "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" : "space-y-2"}>{files.map((file) => <FileCard key={file._id} file={file} view={view} />)}</div>}
+    {tags.length > 0 && <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Filter by tag">
+      <span className="mr-1 text-sm text-muted-foreground">Tags</span>
+      {tags.map((candidate) => <Button key={candidate} type="button" size="sm" variant={activeTag === candidate ? "secondary" : "ghost"} aria-pressed={activeTag === candidate} onClick={() => setTag(activeTag === candidate ? null : candidate)}>{candidate}</Button>)}
+    </div>}
+    {isLoading ? <FileListSkeleton view={view} /> : error ? <p role="alert">Could not load documents.</p> : files.length === 0 ? <p className="text-muted-foreground">{activeTag ? `No documents tagged “${activeTag}” here.` : scope === "shared" ? "Nothing has been shared with you yet." : scope === "mine" ? "You haven't created any documents yet." : "No documents yet."}</p> : <div className={view === "card" ? "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" : "space-y-2"}>{files.map((file) => <FileCard key={file._id} file={file} view={view} />)}</div>}
   </div>;
 }

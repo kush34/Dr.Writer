@@ -223,3 +223,12 @@ export const shareDocument = async (documentId: string, userToAddMail: string, r
 export const removeDocumentMember = async (documentId: string, userId: string) => {
   await apiClient.delete(`/document/${documentId}/users/${userId}`);
 };
+
+export const deleteDocument = async (documentId: string) => {
+  await apiClient.delete(`/document/${documentId}`);
+};
+
+export const setDocumentTags = async (documentId: string, tags: string[]): Promise<string[]> => {
+  const res = await apiClient.put(`/document/${documentId}/tags`, { tags });
+  return res.data.tags;
+};

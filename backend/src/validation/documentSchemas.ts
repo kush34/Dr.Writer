@@ -66,6 +66,13 @@ export const removeUserParamsSchema = z.object({
   userId: z.string().trim().min(1),
 });
 
+export const MAX_TAGS = 10;
+export const setTagsSchema = z.object({
+  // Trimmed, 1-30 characters, at most 10, and unique ignoring case. Stored as typed.
+  tags: z.array(z.string().trim().min(1).max(30)).max(MAX_TAGS)
+    .refine(tags => new Set(tags.map(tag => tag.toLocaleLowerCase())).size === tags.length, "Tags must be unique"),
+});
+
 export const documentActionParamsSchema = z.object({
   documentId: z.string().trim().min(1),
 });

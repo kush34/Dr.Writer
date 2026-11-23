@@ -42,6 +42,11 @@ const Editor = ({ onEditorReady }: EditorProps) => {
   const { data, isLoading, error } = useQuery<DocumentDTO>({
     queryKey: ["document", id],
     enabled: !!user && !!id,
+    // A deleted or forbidden document will not come back by retrying.
+    retry: (count, error) => {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      return status !== 403 && status !== 404 && count < 3;
+    },
     queryFn: async (): Promise<DocumentDTO> => {
       // An offline copy is only pushed when the user may still edit; after access was lost it stays on this device.
       const synced = await syncData(id).catch((error) => {
@@ -131,7 +136,10 @@ const Editor = ({ onEditorReady }: EditorProps) => {
 
   if (userLoading || isLoading) return <EditorSkeleton />;
   if (!user) return <p>User not logged in</p>;
-  if (error) return <p>Failed to load document</p>;
+  if (error) {
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    return <p role="alert">{status === 403 || status === 404 ? "This document was deleted or you no longer have access to it." : "Failed to load document"}</p>;
+  }
   if (!data) return <p>No document data</p>;
   // Documents from before roles existed come back without one; the server still rejects writes from non-editors.
   const readOnly = !!data.role && data.role !== "owner" && data.role !== "editor";

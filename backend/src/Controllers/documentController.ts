@@ -13,6 +13,8 @@ import {
   getDocumentRole,
   listDocumentMembers,
   removeUserFromDocument,
+  deleteDocument,
+  setDocumentTags,
   getDocumentList,
   searchDocuments,
   getTestDocument,
@@ -35,6 +37,7 @@ import {
   documentActionParamsSchema,
   documentIdBodySchema,
   removeUserParamsSchema,
+  setTagsSchema,
   getChatsParamsSchema,
   registerDocumentImageSchema,
   syncDocumentSchema,
@@ -245,6 +248,26 @@ const listMembersHandler = async (req: Request, res: Response) => {
   }
 };
 
+const deleteDocumentHandler = async (req: Request, res: Response) => {
+  try {
+    const { documentId } = documentActionParamsSchema.parse(req.params);
+    await deleteDocument(requireAuthenticatedUser(req), documentId);
+    res.status(200).json({ message: "document deleted" });
+  } catch (error) {
+    handleControllerError(res, error);
+  }
+};
+
+const setTagsHandler = async (req: Request, res: Response) => {
+  try {
+    const { documentId } = documentActionParamsSchema.parse(req.params);
+    const { tags } = setTagsSchema.parse(req.body);
+    res.status(200).json({ tags: await setDocumentTags(requireAuthenticatedUser(req), documentId, tags) });
+  } catch (error) {
+    handleControllerError(res, error);
+  }
+};
+
 export const registerDocumentRoutes = (router: Router) => {
   router.get("/getDoc", getDocHandler);
   const presentationUpload = multer({ limits: { fileSize: 6 * 1024 * 1024, files: 1, fields: 0 } }).single("file");
@@ -278,6 +301,8 @@ export const registerDocumentRoutes = (router: Router) => {
   router.post("/adduser", firebaseTokenVerify, addUserHandler);
   router.get("/:documentId/members", firebaseTokenVerify, listMembersHandler);
   router.delete("/:documentId/users/:userId", firebaseTokenVerify, removeUserHandler);
+  router.put("/:documentId/tags", firebaseTokenVerify, setTagsHandler);
+  router.delete("/:documentId", firebaseTokenVerify, deleteDocumentHandler);
   router.post(
     "/actions/:documentId",
     firebaseTokenVerify,

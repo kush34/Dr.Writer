@@ -110,7 +110,7 @@ export const createDocument = async (userId: string, title: string, kind: "docum
 
 export const getDocumentList = async (userId: string) => {
   const documents = await Document.find(anyRoleFilter(userId)).select(
-    "kind title content createdAt editedAt uploadStatus uploadError sourceFileName user_id users commenters viewers"
+    "kind title content createdAt editedAt uploadStatus uploadError sourceFileName user_id users commenters viewers tags"
   ).lean();
   // Documents shared with this user carry the owner's name, so Home can say who shared them.
   const sharedOwnerIds = [...new Set(documents.filter(document => !isDocumentOwner(userId, document.user_id)).map(document => String(document.user_id)))];
@@ -234,6 +234,34 @@ export const removeUserFromDocument = async (requesterId: string, fileId: string
   if (isDocumentOwner(targetUserId, document.user_id)) throw new AppError(400, "The owner cannot be removed");
   await Document.updateOne({ _id: fileId }, { $pull: { users: targetUserId, commenters: targetUserId, viewers: targetUserId } });
   documentAccessChanged(fileId);
+};
+
+/** Replaces the document's tags. Owner or editor. Tags are labels, not content, so this does not bump `revision` and never conflicts with a save. */
+export const setDocumentTags = async (userId: string, fileId: string, tags: string[]) => {
+  const document = await getDocumentData(userId, fileId);
+  assertCanEdit(getDocumentRole(userId, document));
+  await Document.updateOne({ _id: fileId }, { $set: { tags } });
+  return tags;
+};
+
+/**
+ * Permanently deletes a document, its chat history and its uploaded images. Owner only.
+ * The document goes first so access ends at once; image cleanup is best effort and never fails the delete.
+ */
+export const deleteDocument = async (userId: string, fileId: string) => {
+  const document = await findDocumentOrThrow(fileId);
+  if (!isDocumentOwner(userId, document.user_id)) throw new AppError(403, "Only the owner can delete this document");
+  await Document.deleteOne({ _id: fileId });
+  await Chat.deleteMany({ documentId: fileId });
+  documentAccessChanged(fileId);
+  if (document.relatedImages?.length && process.env.CLOUDINARY_CLOUD_NAME) {
+    try {
+      await cloudinary.api.delete_resources_by_prefix(`documents/${fileId}/`);
+    } catch (error) {
+      // Logged without the error body, which can echo request details.
+      console.error(`Could not remove uploaded images for deleted document ${fileId}:`, (error as Error)?.message);
+    }
+  }
 };
 
 /** Owner, then collaborators with their role. Owner only, since it exposes emails. */
