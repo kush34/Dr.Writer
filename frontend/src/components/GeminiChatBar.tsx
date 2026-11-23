@@ -1,5 +1,6 @@
 import { requestEdit } from "@/service/editAction";
 import { summarizeEdits } from "@/service/editPreview";
+import { notifyUser, requestNotificationPermission } from "@/service/notify";
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -20,7 +21,7 @@ import apiClient from "@/service/axiosConfig";
 import { isAxiosError } from "axios";
 import { getAuth } from "firebase/auth";
 import { toast } from "@/components/ui/rare-toast";
-import { getDefaultModel } from "@/config/models";
+import { getDefaultModel, weakModelReason } from "@/config/models";
 import { ModelSelector } from "@/components/ModelSelector";
 import { ChatMessagesSkeleton } from "@/components/PageSkeleton";
 import ReactMarkdown from "react-markdown";
@@ -82,10 +83,10 @@ function GeminiChatPanel({
   retrySend,
   geminiLoading,
   currentModelSetter,
-  modelChanges, docMode, setDocMode, citation, setCitation, docStatus, editLoading, editPreview, reviewSummary, reviewInDocument, onReviewDecision,
+  modelChanges, docMode, setDocMode, citation, setCitation, docStatus, editLoading, editPreview, reviewSummary, reviewInDocument, onReviewDecision, question,
 }: {
   docMode: boolean; setDocMode: (value: boolean) => void;
-  citation: string; setCitation: (value: string) => void; docStatus: string; editLoading: boolean; editPreview: string; reviewSummary: string | null; reviewInDocument: boolean; onReviewDecision: (accept: boolean) => void;
+  citation: string; setCitation: (value: string) => void; docStatus: string; editLoading: boolean; editPreview: string; reviewSummary: string | null; reviewInDocument: boolean; onReviewDecision: (accept: boolean) => void; question: string | null;
   data: DocumentChatResponse | undefined;
   chatLoading: boolean;
   currentModel: string;
@@ -147,7 +148,7 @@ function GeminiChatPanel({
       <div className={docMode ? "px-4 pt-2" : "relative min-h-0 flex-1"}>
       <div ref={messagesRef} className={docMode ? "" : "h-full overflow-y-auto p-3"}>
         <div className="flex flex-col gap-2">
-          {docMode ? <>{editLoading ? <AiStatus state="writing" label={docStatus || "Preparing edits"} timer={false} /> : <p role="status" className="whitespace-pre-wrap text-sm text-muted-foreground">{docStatus}</p>}{data?.documentChat?.filter((item) => item.streaming).flatMap((item) => item.toolActivity ?? []).map((activity, i) => <ToolActivityLabel key={i} activity={activity} />)}</> : <>{chatLoading ? <ChatMessagesSkeleton /> : data?.documentChat?.length === 0 ? (
+          {docMode ? <>{editLoading ? <AiStatus state="writing" label={docStatus || "Preparing edits"} timer={false} /> : docStatus !== question && <p role="status" className="whitespace-pre-wrap text-sm text-muted-foreground">{docStatus}</p>}{data?.documentChat?.filter((item) => item.streaming).flatMap((item) => item.toolActivity ?? []).map((activity, i) => <ToolActivityLabel key={i} activity={activity} />)}</> : <>{chatLoading ? <ChatMessagesSkeleton /> : data?.documentChat?.length === 0 ? (
             <div className="px-4 text-muted-foreground">Enter prompt for {currentModel} response</div>
           ) : (
             data?.documentChat?.map((item, index) => (
@@ -198,6 +199,7 @@ function GeminiChatPanel({
       </div>
 
       {editPreview && !reviewSummary && <div className="max-h-48 overflow-y-auto whitespace-pre-wrap border-t px-4 py-2 text-sm text-muted-foreground" aria-label="AI work preview">{editPreview}</div>}
+      {question && !reviewSummary && !editLoading && <section aria-label="Dr. Writer needs your input" className="mx-3 mb-0 mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">Needs your input</p><p className="mt-1 whitespace-pre-wrap text-sm">{question}</p><p className="mt-1 text-xs text-muted-foreground">Type your answer below and send it to continue.</p></section>}
       <div className={docMode ? "p-3" : "border-t border-sidebar-border p-3"}>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -214,6 +216,7 @@ function GeminiChatPanel({
               {citation && <div className="rounded-md border bg-muted p-2 text-xs"><div className="flex justify-between gap-2"><span className="font-semibold">Selected text</span><button type="button" onClick={() => setCitation("")} aria-label="Remove cited text">Remove</button></div><p className="mt-1 max-h-20 overflow-auto whitespace-pre-wrap">{citation}</p></div>}
 
               <div className="flex items-center justify-between gap-2"><div ref={modelPickerRef}><ModelSelector value={currentModel} onChange={currentModelSetter} /></div>{docMode && <button type="button" aria-label="Switch to chat mode" title="Switch to chat mode" className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => setDocMode(false)}><MessageSquare size={16} /></button>}</div>
+              {(docMode || actionMode) && weakModelReason(currentModel) && <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-900 dark:text-amber-200">{weakModelReason(currentModel)} Pick a larger model for edits.</p>}
 
               {docMode ? <PromptBox
                 className="w-full max-w-none"
@@ -226,9 +229,9 @@ function GeminiChatPanel({
                 disabled={geminiLoading}
                 efforts={[{ id: "default", label: "Send" }]}
                 hint={null}
-                placeholder="Describe changes to your document…"
+                placeholder={question ? "Type your answer…" : "Describe changes to your document…"}
                 inputProps={{
-                  "aria-label": "Describe changes to your document",
+                  "aria-label": question ? "Answer the question" : "Describe changes to your document",
                 }}
               /> : <div className="mt-2 flex">
                 <Input
@@ -266,6 +269,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
   useEffect(() => () => { reviewResolver.current?.(false); reviewResolver.current = null; }, []);
   const requestReview = (operations: unknown, inDocument = false) => {
     const summary = summarizeEdits(operations);
+    notifyUser("Edits are ready to review", "Dr. Writer finished. Accept or discard the changes.");
     setEditLoading(false);
     setReviewInDocument(inDocument);
     setReviewSummary(summary);
@@ -301,6 +305,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
 
   const handleActions = async () => {
     if (!prompt.trim() || geminiLoading) return;
+    requestNotificationPermission();
     setEditPreview("");
     const showPreview = (text: string) => setEditPreview(current => current ? `${current}\n\n${text}` : text);
     if (presentation?.current) {
@@ -325,6 +330,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
         const message = isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "Could not edit slides.";
         setDocStatus(message);
         toast.error(message);
+        notifyUser("Slide edit failed", message);
       } finally { setGeminiLoading(false); setEditLoading(false); }
       return;
     }
@@ -360,6 +366,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
       if (question) {
         await saveAction(currentPrompt, question);
         setPendingQuestion({ command, question });
+        notifyUser("Dr. Writer needs your input", question);
         setDocStatus(question);
         queryClient.setQueryData(["documentChat", documentId], (old: DocumentChatResponse | undefined) => old && ({ ...old, documentChat: old.documentChat.map((item, index) => index === old.documentChat.length - 1 ? { ...item, response: question } : item) }));
         return;
@@ -412,6 +419,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
       const message = err instanceof Error ? err.message : "Could not update document. Please try again.";
       setDocStatus(message);
       toast.error(message);
+      notifyUser("Document edit failed", message);
     } finally {
       setGeminiLoading(false);
       setEditLoading(false);
@@ -507,7 +515,7 @@ export function GeminiChatBar({ documentId, mode = "mobile", side = "left", docM
 
   const panel = (
     <GeminiChatPanel
-      docMode={docMode} setDocMode={setDocMode} citation={citation} setCitation={setCitation} docStatus={docStatus} editLoading={editLoading} editPreview={editPreview} reviewSummary={reviewSummary} reviewInDocument={reviewInDocument} onReviewDecision={finishReview}
+      docMode={docMode} setDocMode={setDocMode} citation={citation} setCitation={setCitation} docStatus={docStatus} editLoading={editLoading} editPreview={editPreview} reviewSummary={reviewSummary} reviewInDocument={reviewInDocument} onReviewDecision={finishReview} question={pendingQuestion?.question ?? null}
       data={data}
       chatLoading={chatLoading}
       currentModel={currentModel}

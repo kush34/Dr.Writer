@@ -1,7 +1,9 @@
-import { ZodError } from "zod";
+import { ZodError, type z } from "zod";
 import { getOpenRouterKey } from "../service/openrouterAuth";
-import { presentationPlan } from "../validation/documentSchemas";
+import { assertClean, cleanSlides, lintDocumentOps, lintSlides } from "../utils/lintEdits";
+import { presentationPlan, presentationDeck } from "../validation/documentSchemas";
 import { Response } from "express";
+import mongoose from "mongoose";
 import { documentText, searchExcerpt } from "../utils/documentSearch";
 import cloudinary from "../Config/cloudinary";
 import User from "../Models/userModel";
@@ -10,11 +12,14 @@ import Chat from "../Models/chatModel";
 import { MAX_TOKENS_PER_REQUEST } from "../Config/llm";
 // import { getEditOperations, useGeminiStream } from "../service/gemini";
 import { applyEdits } from "../utils/applyEdits";
+import { documentToMarkdownBlocks } from "../utils/markdown";
 import { validateDocumentOperations } from "../utils/llmActions";
 import { AppError, isAppError } from "../utils/appError";
 import { openRouterStream, openRouterComplete, openRouterWithTools } from "../service/openrouter";
 import { getMcpConfig } from "../service/mcpConfig";
 import { connectMcpServers } from "../service/mcpClient";
+
+const EDIT_SYSTEM_PROMPT = `You are an expert writing and presentation editor inside a document app. You write the finished content itself, never instructions for a person to write it. Be specific and concrete: no filler, no placeholders such as "Lorem ipsum" or "[Your name]", no repeated points. Match the language and tone of any existing content, and preserve content the user did not ask you to change. Respond with a single valid JSON object only: no markdown fences and no commentary.`;
 
 const extractJsonPayload = (rawResponse: string) => {
   const trimmed = rawResponse.trim();
@@ -175,6 +180,15 @@ export const addUserToDocument = async (
   });
 };
 
+/** Earlier edit requests on this document, so "make it shorter" or "now the next section" keep their meaning. Optional context: any failure just means none. */
+const recentRequests = async (documentId: string) => {
+  if (mongoose.connection.readyState !== 1) return "";
+  try {
+    const chats = await Chat.find({ documentId }).sort({ createdAt: -1, _id: -1 }).limit(4).lean();
+    return chats.reverse().map(chat => `- User: ${String(chat.prompt).slice(0, 300)}\n  Result: ${String(chat.response).slice(0, 200)}`).join("\n");
+  } catch { return ""; }
+};
+
 export const performDocumentAction = async (
   userId: string,
   documentId: string,
@@ -183,7 +197,8 @@ export const performDocumentAction = async (
   modelName?: string,
   outline?: (string | null)[][],
   onProgress: (status: string) => void = () => {},
-  onPreview: (text: string) => void = () => {}
+  onPreview: (text: string) => void = () => {},
+  deck?: z.infer<typeof presentationDeck>
 ) => {
   const document = await findDocumentOrThrow(documentId);
 
@@ -193,11 +208,13 @@ export const performDocumentAction = async (
 
   const apiKey = await getOpenRouterKey(userId);
   const model = modelName || "openai/gpt-4o-mini";
+  const history = await recentRequests(documentId);
+  const background = `Document title: ${JSON.stringify(String(document.title ?? "").slice(0, 200))}${history ? `\nEarlier requests on this document, oldest first (for context only; do not redo them):\n${history}` : ""}\n`;
   const completeValidated = async <T>(prompt: string, validate: (value: any) => T): Promise<T> => {
     let feedback = "";
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt) onProgress("Retrying the model response");
-      const raw = await openRouterComplete(prompt + feedback, model, apiKey);
+      const raw = await openRouterComplete(prompt + feedback, model, apiKey, { system: EDIT_SYSTEM_PROMPT, json: true, temperature: 0.3 });
       onProgress("Checking the response");
       try {
         if (!raw.trim()) throw new Error("The response was empty; provide the requested JSON object.");
@@ -234,18 +251,19 @@ export const performDocumentAction = async (
     const operations = await completeValidated(
       `Edit a PowerPoint presentation. Return JSON {"operations":[...]}.
 Allowed operations:
-- {"type":"append","title":"...","body":"..."} adds a new slide at the end.
+- {"type":"append","layout":"title|content|section","title":"...","bullets":["..."],"table":{"header":["..."],"rows":[["..."]]}} adds a new slide at the end. layout defaults to "content". Use "title" for an opening slide (title plus an optional one-line "body" subtitle, no bullets) and "section" for a divider. For "content" slides give 3 to 5 "bullets", each a short phrase of at most 12 words with no bullet characters. Use "table" instead of bullets only for comparisons or figures, at most 6 rows. Titles stay under 8 words.
 - {"type":"addText","slide":N,"text":"..."} adds a text box to an existing slide N.
 - {"type":"replace","slide":N,"shape":M,"text":"..."} rewrites existing shape M on existing slide N.
-The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for new slides. Keep slide text concise and preserve unrelated content. Outline lists shapes in zero-based order; null means non-text.
-Return one JSON object with no markdown fences. Example for a new slide: {"operations":[{"type":"append","title":"Overview","body":"First key point\\nSecond key point"}]}. For existing slides use only valid zero-based indexes from the outline. Never target a null shape. Escape line breaks inside JSON strings.
+The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for new slides. Preserve unrelated content. Outline lists the text of each shape in zero-based order; null means non-text. Never target a null shape.
+${deck ? `Slide size is ${deck.width}x${deck.height} points. Available layouts: ${deck.layouts.map(layout => `${layout.name} (${layout.type})`).join(", ")}. Slides and their shapes: ${JSON.stringify(deck.slides)}\n` : ""}Example: {"operations":[{"type":"append","layout":"title","title":"Q3 Plan","body":"Priorities and budget"},{"type":"append","title":"Priorities","bullets":["Ship the editor","Cut load time in half","Hire two engineers"]}]}
 Outline: ${JSON.stringify(outline)}
-Request: ${command}${plan}`, value => {
-        const ops = presentationPlan.parse(value?.operations);
+${background}Request: ${command}${plan}`, value => {
+        const ops = cleanSlides(presentationPlan.parse(value?.operations));
+        assertClean(lintSlides(ops));
         if (ops.some(op => op.type !== "append" && (op.slide >= outline.length || (op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))))) throw new Error("Slide or shape index is invalid");
         return ops;
       });
-    onPreview(`Proposed slide edits\n${operations.map(op => op.type === "append" ? `Add slide: ${op.title}\n${op.body}` : `Slide ${op.slide + 1}: ${op.text}`).join("\n\n")}`);
+    onPreview(`Proposed slide edits\n${operations.map(op => op.type === "append" ? `Add slide: ${op.title}\n${[op.body, ...(op.bullets ?? []).map(point => `  • ${point}`), op.table ? [op.table.header, ...op.table.rows].map(row => row.join(" | ")).join("\n") : ""].filter(Boolean).join("\n")}` : `Slide ${op.slide + 1}: ${op.text}`).join("\n\n")}`);
     return { operations };
   }
 
@@ -268,24 +286,31 @@ Request: ${command}${plan}`, value => {
     }
   }
   onProgress("Preparing document edits");
+  const { text: documentMarkdown, locked } = documentToMarkdownBlocks(content);
   const llmResponse = await completeValidated(
-    `You are a TipTap document editor. Return only JSON {"question":"...","operations":[...]}.
-Follow the user's request and write the actual content, not instructions for a person to write it. Return exactly one JSON object, with no markdown fences or extra text. Escape line breaks inside strings as \\n.
-Use a question and no operations only if clarification is essential. Otherwise produce operations using original top-level block indexes (current count ${blockCount}):
-{"type":"insert","at":N,"blocks":[...]}, {"type":"replace","from":N,"to":N,"blocks":[...]}, {"type":"delete","from":N,"to":N}.
-Blocks may be {"type":"paragraph","text":"..."}, {"type":"heading","level":1,"text":"..."}, {"type":"bulletList","items":["..."]} or {"type":"orderedList","items":["..."]}. Insert at 0 through ${blockCount}. Replace and delete use inclusive indexes. Do not overlap edits. Keep unrelated blocks and formatting unchanged. For a new document, plan its structure before writing; use appropriate headings and lists. For simple text, an operation may use "text" instead of "blocks".
-Examples (indexes refer to the original document):
-To insert content into an empty document with one blank block: {"operations":[{"type":"replace","from":0,"to":0,"blocks":[{"type":"heading","level":1,"text":"Title"},{"type":"paragraph","text":"A useful opening paragraph."},{"type":"bulletList","items":["First point","Second point"]}]}]}.
-To insert after all existing blocks: {"operations":[{"type":"insert","at":${blockCount},"text":"New paragraph."}]}.
-Use one operation with multiple blocks when adding multiple sections at the same position. A replace range is inclusive. Never use negative indexes, duplicate positions or overlapping ranges. Each insert or replace must contain either blocks or text, not both.
-Document: ${JSON.stringify(content)}
+    `Edit a document. Return only JSON {"question":"...","operations":[...]}.
+The document is listed as top-level blocks, each starting with its zero-based index in brackets, e.g. "[2] ## Heading". Block text is Markdown; a whole list is one block. There are currently ${blockCount} block(s).
+Follow the user's request and write the actual content, not instructions for a person to write it. Return exactly one JSON object with no markdown fences. Escape line breaks inside JSON strings as \\n.
+Use a question and no operations only if clarification is essential. Otherwise return operations, with indexes referring to the ORIGINAL blocks:
+{"type":"insert","at":N,"markdown":"..."} inserts before block N (N=${blockCount} appends at the end).
+{"type":"replace","from":N,"to":N,"markdown":"..."} replaces blocks N..to inclusive.
+{"type":"delete","from":N,"to":N} deletes blocks N..to inclusive.
+Markdown may use: # ## ### headings, paragraphs separated by a blank line, "- " bullets, "1. " numbered lists (indent nested items by two spaces), "> " quotes, fenced code blocks, "---" rules, **bold**, *italic*, ~~strike~~, \`code\` and [text](https://url). Do not use tables, HTML or images.
+Never replace or delete blocks shown as <... not editable>. Keep unrelated blocks unchanged and do not repeat text that already exists. For a new document, use a clear structure with headings, short paragraphs and lists where they help. Do not overlap edits or reuse a start index.
+Example, filling an empty document: {"operations":[{"type":"replace","from":0,"to":0,"markdown":"# Title\\n\\nA useful opening paragraph.\\n\\n- First point\\n- Second point"}]}
+Example, appending: {"operations":[{"type":"insert","at":${blockCount},"markdown":"## New section\\n\\nNew paragraph."}]}
+${background}Document:
+${documentMarkdown || "(empty)"}
 Command: ${command}${documentPlan}`, value => {
       if (typeof value?.question === "string" && value.question.trim() && (!value.operations || (Array.isArray(value.operations) && !value.operations.length))) return { question: value.question.trim(), operations: [] };
-      return { operations: validateDocumentOperations(value?.operations, blockCount) };
+      const ops = validateDocumentOperations(value?.operations, blockCount);
+      assertClean(lintDocumentOps(ops));
+      for (const op of ops) if (op.type !== "insert") for (let i = op.from; i <= op.to; i++) if (locked.has(i)) throw new Error(`Block ${i} is not editable and cannot be replaced or deleted`);
+      return { operations: ops };
     });
   if (llmResponse.question) return { question: llmResponse.question };
   const updatedContent = applyEdits(content as Parameters<typeof applyEdits>[0], llmResponse.operations);
-  onPreview(`Proposed document edits\n${llmResponse.operations.map(op => op.type === "delete" ? `Delete blocks ${op.from + 1}–${op.to + 1}` : (op.blocks ? op.blocks.map(block => block.type === "heading" || block.type === "paragraph" ? block.text : block.items.join("\n")).join("\n") : op.text)).join("\n\n")}`);
+  onPreview(`Proposed document edits\n${llmResponse.operations.map(op => op.type === "delete" ? `Delete blocks ${op.from + 1}–${op.to + 1}` : (op.markdown ?? (op.blocks ? op.blocks.map(block => block.type === "heading" || block.type === "paragraph" ? block.text : block.items.join("\n")).join("\n") : op.text))).join("\n\n")}`);
 
   return {
     updatedContent,

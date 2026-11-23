@@ -6,11 +6,32 @@ export const savePresentationSchema = z.object({
   title: z.string().trim().min(1).max(255).optional(),
 });
 export const presentationOutline = z.array(z.array(z.string().max(2000).nullable()).max(300)).max(300);
+export const presentationDeck = z.object({
+  width: z.number().positive(),
+  height: z.number().positive(),
+  layouts: z.array(z.object({ name: z.string().max(100), type: z.string().max(20) })).max(100),
+  slides: z.array(z.object({ layout: z.string().max(100).nullable(), shapes: z.array(z.string().max(40)).max(300) })).max(300),
+});
 export const presentationPlan = z.array(z.discriminatedUnion("type", [
-  z.object({ type: z.literal("append"), title: z.string().min(1).max(200), body: z.string().min(1).max(4000) }),
+  z.object({
+    type: z.literal("append"),
+    title: z.string().min(1).max(200),
+    body: z.string().max(4000).optional(),
+    bullets: z.array(z.string().min(1).max(300)).max(8).optional(),
+    layout: z.enum(["title", "content", "section"]).optional(),
+    table: z.object({
+      header: z.array(z.string().max(100)).min(1).max(8),
+      rows: z.array(z.array(z.string().max(200)).max(8)).min(1).max(12),
+    }).refine(table => table.rows.every(row => row.length === table.header.length), "Every table row needs one cell per header").optional(),
+  }),
   z.object({ type: z.literal("replace"), slide: z.number().int().nonnegative(), shape: z.number().int().nonnegative(), text: z.string().max(4000) }),
   z.object({ type: z.literal("addText"), slide: z.number().int().nonnegative(), text: z.string().min(1).max(4000) }),
-])).min(1).max(60);
+])).min(1).max(60).superRefine((ops, ctx) => {
+  ops.forEach((op, index) => {
+    if (op.type === "append" && !(op.body?.trim() || op.bullets?.length || op.table || op.layout === "title" || op.layout === "section"))
+      ctx.addIssue({ code: "custom", path: [index], message: "A content slide needs bullets, a body or a table" });
+  });
+});
 
 export const createDocumentSchema = z.object({
   kind: z.enum(["document", "presentation"]).default("document"),
@@ -56,6 +77,7 @@ export const registerDocumentImageSchema = z.object({
 
 export const documentActionBodySchema = z.object({
   outline: presentationOutline.optional(),
+  deck: presentationDeck.optional(),
   command: z.string().trim().min(1),
   content: z.object({ type: z.literal("doc"), content: z.array(z.unknown()) }).passthrough().optional(),
   modelName: z.string().optional(),

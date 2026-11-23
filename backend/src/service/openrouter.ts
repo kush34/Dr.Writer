@@ -230,17 +230,30 @@ export async function openRouterWithTools(prompt: string, modelName: string, too
   throw new AppError(502, "The request exceeded the tool call limit.");
 }
 
+export type CompleteOptions = {
+  /** System message that sets the role and output rules. */
+  system?: string;
+  /** Ask the provider for a JSON object (response_format: json_object). */
+  json?: boolean;
+  temperature?: number;
+  maxTokens?: number;
+};
+
 export const openRouterComplete = async (
   prompt: string,
   modelName: string,
-  apiKey?: string
+  apiKey?: string,
+  options: CompleteOptions = {}
 ): Promise<string> => {
   const response = await fetch(OPENROUTER_API_URL, {
     method: "POST",
     headers: getHeaders(apiKey),
     body: JSON.stringify({
       model: modelName,
-      messages: [{ role: "user", content: prompt }],
+      messages: [...(options.system ? [{ role: "system", content: options.system }] : []), { role: "user", content: prompt }],
+      max_tokens: options.maxTokens ?? MAX_TOKENS_PER_REQUEST,
+      ...(options.temperature !== undefined && { temperature: options.temperature }),
+      ...(options.json && { response_format: { type: "json_object" } }),
     }),
   });
 
