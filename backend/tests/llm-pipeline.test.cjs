@@ -184,3 +184,24 @@ test('placeholder output is sent back to the model and corrected on retry', asyn
   assert.equal(prompts.length, 2);
   assert.ok(prompts[1].includes('placeholder or chatty text'));
 });
+
+test('edit prompts include the document title and recent requests', async t => {
+  const mongoose = require('mongoose');
+  const Document = require('../dist/Models/documentModel').default;
+  const Chat = require('../dist/Models/chatModel').default;
+  const auth = require('../dist/service/openrouterAuth');
+  const router = require('../dist/service/openrouter');
+  const { performDocumentAction } = require('../dist/Services/documentService');
+  const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original' }] }] };
+  t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', title: 'Quarterly report', content }));
+  t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  Object.defineProperty(mongoose.connection, 'readyState', { configurable: true, get: () => 1 });
+  t.after(() => { delete mongoose.connection.readyState; });
+  const query = { sort: () => query, limit: () => query, lean: async () => [{ prompt: 'Add a summary', response: 'Applied' }, { prompt: 'Shorten it', response: 'Applied' }] };
+  t.mock.method(Chat, 'find', () => query);
+  let seen = '';
+  t.mock.method(router, 'openRouterComplete', async prompt => { seen = prompt; return '{"operations":[{"type":"insert","at":1,"markdown":"More."}]}'; });
+  await performDocumentAction('owner', 'doc', 'continue', content, 'model');
+  assert.ok(seen.includes('"Quarterly report"'));
+  assert.ok(seen.indexOf('Add a summary') > seen.indexOf('Shorten it'), 'oldest first, newest last');
+});
