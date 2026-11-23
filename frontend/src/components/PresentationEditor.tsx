@@ -7,7 +7,7 @@ import { createBrowserAutomationHost, type PptxEditorInstance } from "@pptx-edit
 import "@pptx-editor.dev/core/styles/editor.css";
 import blank from "../assets/blank.pptx?url&inline";
 import { useSharedEditor } from "@/context/EditorContext";
-import { readOutline, applyPresentationEdits } from "@/service/presentation";
+import { readOutline, readDeck, applyPresentationEdits } from "@/service/presentation";
 import { requestEdit } from "@/service/editAction";
 import apiClient from "@/service/axiosConfig";
 import { isAxiosError } from "axios";
@@ -47,7 +47,7 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
     presentation.current = async (command, modelName, onProgress, onPreview, onReview) => {
       if (!editor.session) throw new Error("Wait for the presentation to open.");
       const revision = host.revision();
-      const data = await requestEdit(id, { command, modelName, outline: readOutline(host) }, onProgress, onPreview);
+      const data = await requestEdit(id, { command, modelName, outline: readOutline(host), deck: readDeck(host) }, onProgress, onPreview);
       if (!active) throw new Error("The presentation was closed.");
       onProgress("Ready to review slide edits");
       if (!await onReview(data.operations)) return false;

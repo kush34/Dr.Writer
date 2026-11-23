@@ -132,7 +132,7 @@ const performDocumentActionHandler = async (req: Request, res: Response) => {
   try {
     const userId = requireAuthenticatedUser(req);
     const { documentId } = documentActionParamsSchema.parse(req.params);
-    const { command, content, modelName, outline } = documentActionBodySchema.parse(req.body);
+    const { command, content, modelName, outline, deck } = documentActionBodySchema.parse(req.body);
     const stream = req.get("accept")?.includes("text/event-stream") === true;
     if (stream) {
       res.set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
@@ -140,7 +140,8 @@ const performDocumentActionHandler = async (req: Request, res: Response) => {
     }
     const result = await performDocumentAction(userId, documentId, command, content, modelName, outline,
       stream ? status => res.write(`data: ${JSON.stringify({ type: "progress", status })}\n\n`) : undefined,
-      stream ? text => res.write(`data: ${JSON.stringify({ type: "preview", text })}\n\n`) : undefined);
+      stream ? text => res.write(`data: ${JSON.stringify({ type: "preview", text })}\n\n`) : undefined,
+      deck);
     if (stream) { res.write(`data: ${JSON.stringify({ type: "result", result })}\n\n`); res.end(); }
     else res.status(200).json(result);
   } catch (error) {

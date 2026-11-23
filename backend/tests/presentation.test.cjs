@@ -48,3 +48,25 @@ test("presentation actions and saves enforce document access, kind, and revision
   doc.kind = "document";
   await assert.rejects(savePresentation("owner", "deck", 1, pptx), { statusCode: 400 });
 });
+
+test("slide edits accept layouts, bullets and tables and the prompt describes the deck", async t => {
+  const { presentationPlan, documentActionBodySchema } = require("../dist/validation/documentSchemas");
+  const deck = { width: 960, height: 540, layouts: [{ name: "Title Slide", type: "title" }, { name: "Title and Content", type: "obj" }], slides: [{ layout: "Blank", shapes: [] }] };
+  assert.ok(documentActionBodySchema.safeParse({ command: "x", outline: [[]], deck }).success);
+  const plan = [
+    { type: "append", layout: "title", title: "Q3 Plan", body: "Priorities" },
+    { type: "append", title: "Priorities", bullets: ["Ship", "Measure"] },
+    { type: "append", title: "Budget", table: { header: ["Item", "Cost"], rows: [["Hiring", "$1"]] } },
+  ];
+  assert.ok(presentationPlan.safeParse(plan).success);
+  assert.ok(!presentationPlan.safeParse([{ type: "append", title: "Empty" }]).success);
+  assert.ok(!presentationPlan.safeParse([{ type: "append", title: "T", table: { header: ["A", "B"], rows: [["only one"]] } }]).success);
+
+  t.mock.method(Document, "findById", async () => ({ kind: "presentation", revision: 0, user_id: "owner", users: [] }));
+  t.mock.method(auth, "getOpenRouterKey", async () => undefined);
+  let seen = "";
+  t.mock.method(router, "openRouterComplete", async prompt => { seen = prompt; return JSON.stringify({ operations: plan }); });
+  const result = await performDocumentAction("owner", "deck", "Add a plan", undefined, "m", [["First slide"]], () => {}, () => {}, deck);
+  assert.deepEqual(result.operations, plan);
+  assert.ok(seen.includes("960x540") && seen.includes("Title and Content (obj)") && seen.includes('"bullets"'));
+});

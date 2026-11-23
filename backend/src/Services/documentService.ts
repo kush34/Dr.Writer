@@ -1,6 +1,6 @@
-import { ZodError } from "zod";
+import { ZodError, type z } from "zod";
 import { getOpenRouterKey } from "../service/openrouterAuth";
-import { presentationPlan } from "../validation/documentSchemas";
+import { presentationPlan, presentationDeck } from "../validation/documentSchemas";
 import { Response } from "express";
 import { documentText, searchExcerpt } from "../utils/documentSearch";
 import cloudinary from "../Config/cloudinary";
@@ -186,7 +186,8 @@ export const performDocumentAction = async (
   modelName?: string,
   outline?: (string | null)[][],
   onProgress: (status: string) => void = () => {},
-  onPreview: (text: string) => void = () => {}
+  onPreview: (text: string) => void = () => {},
+  deck?: z.infer<typeof presentationDeck>
 ) => {
   const document = await findDocumentOrThrow(documentId);
 
@@ -237,18 +238,18 @@ export const performDocumentAction = async (
     const operations = await completeValidated(
       `Edit a PowerPoint presentation. Return JSON {"operations":[...]}.
 Allowed operations:
-- {"type":"append","title":"...","body":"..."} adds a new slide at the end.
+- {"type":"append","layout":"title|content|section","title":"...","bullets":["..."],"table":{"header":["..."],"rows":[["..."]]}} adds a new slide at the end. layout defaults to "content". Use "title" for an opening slide (title plus an optional one-line "body" subtitle, no bullets) and "section" for a divider. For "content" slides give 3 to 5 "bullets", each a short phrase of at most 12 words with no bullet characters. Use "table" instead of bullets only for comparisons or figures, at most 6 rows. Titles stay under 8 words.
 - {"type":"addText","slide":N,"text":"..."} adds a text box to an existing slide N.
 - {"type":"replace","slide":N,"shape":M,"text":"..."} rewrites existing shape M on existing slide N.
-The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for new slides. Keep slide text concise and preserve unrelated content. Outline lists shapes in zero-based order; null means non-text.
-Return one JSON object with no markdown fences. Example for a new slide: {"operations":[{"type":"append","title":"Overview","body":"First key point\\nSecond key point"}]}. For existing slides use only valid zero-based indexes from the outline. Never target a null shape. Escape line breaks inside JSON strings.
+The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for new slides. Preserve unrelated content. Outline lists the text of each shape in zero-based order; null means non-text. Never target a null shape.
+${deck ? `Slide size is ${deck.width}x${deck.height} points. Available layouts: ${deck.layouts.map(layout => `${layout.name} (${layout.type})`).join(", ")}. Slides and their shapes: ${JSON.stringify(deck.slides)}\n` : ""}Example: {"operations":[{"type":"append","layout":"title","title":"Q3 Plan","body":"Priorities and budget"},{"type":"append","title":"Priorities","bullets":["Ship the editor","Cut load time in half","Hire two engineers"]}]}
 Outline: ${JSON.stringify(outline)}
 Request: ${command}${plan}`, value => {
         const ops = presentationPlan.parse(value?.operations);
         if (ops.some(op => op.type !== "append" && (op.slide >= outline.length || (op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))))) throw new Error("Slide or shape index is invalid");
         return ops;
       });
-    onPreview(`Proposed slide edits\n${operations.map(op => op.type === "append" ? `Add slide: ${op.title}\n${op.body}` : `Slide ${op.slide + 1}: ${op.text}`).join("\n\n")}`);
+    onPreview(`Proposed slide edits\n${operations.map(op => op.type === "append" ? `Add slide: ${op.title}\n${[op.body, ...(op.bullets ?? []).map(point => `  • ${point}`), op.table ? [op.table.header, ...op.table.rows].map(row => row.join(" | ")).join("\n") : ""].filter(Boolean).join("\n")}` : `Slide ${op.slide + 1}: ${op.text}`).join("\n\n")}`);
     return { operations };
   }
 
