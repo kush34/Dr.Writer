@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
     name: "public-seo",
     transformIndexHtml(html) {
       if (!origin) return html;
-      return html.replace("</head>", `  <link rel="canonical" href="${origin}/" />\n    <meta property="og:url" content="${origin}/" />\n    <meta property="og:image" content="${origin}/editor-hero.png" />\n  </head>`);
+      return html.replace("</head>", `  <link rel="canonical" href="${origin}/" />\n    <meta property="og:url" content="${origin}/" />\n    <meta property="og:image" content="${origin}/editor-hero.png" />\n    <meta name="twitter:image" content="${origin}/editor-hero.png" />\n  </head>`);
     },
     generateBundle() {
       if (!origin) return;

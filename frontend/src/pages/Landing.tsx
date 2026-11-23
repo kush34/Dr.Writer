@@ -11,7 +11,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import "./landing-models.css";
 import { availableModels } from "@/config/models";
-import { useNavigate } from "react-router-dom";
 
 function HeroEditor() {
   const [editMode, setEditMode] = useState(false);
@@ -115,13 +114,15 @@ const workspaceModes = [
       {
         title: "Create documents",
         description: "Spin up a fresh draft, upload an existing file, and keep your work organized.",
-        image: "./doc.jpg",
+        image: "/doc-landing.webp",
+        height: 667,
         tint: "from-[#fff4d9] via-white to-[#fffdf6]",
       },
       {
         title: "Edit with AI support",
         description: "Improve tone, clarity, and structure while you write instead of after the fact.",
-        image: "./support.png",
+        image: "/support-landing.webp",
+        height: 1000,
         tint: "from-[#e9fff4] via-white to-[#f8fffc]",
       },
     ],
@@ -136,13 +137,15 @@ const workspaceModes = [
       {
         title: "Live collaboration",
         description: "Work in the same document together and watch updates land in real time.",
-        image: "./collab.png",
+        image: "/collab-landing.webp",
+        height: 667,
         tint: "from-[#efe9ff] via-white to-[#fbf9ff]",
       },
       {
         title: "Cloud and offline flow",
         description: "Stay productive online or offline, then sync when you are back.",
-        image: "./offline.png",
+        image: "/offline-landing.webp",
+        height: 1000,
         tint: "from-[#ffecea] via-white to-[#fff8f7]",
       },
     ],
@@ -163,7 +166,7 @@ const faqs = [
   {
     question: "Does it support AI writing help?",
     answer:
-      "Yes. The project already includes LLM-powered assistance to help with editing, refinement, and productivity while writing.",
+      "Yes. You can ask the AI assistant to help refine and edit your writing alongside your document.",
   },
   {
     question: "Can I access my work from anywhere?",
@@ -178,19 +181,10 @@ const faqs = [
 ];
 
 const Landing = () => {
-  const navigate = useNavigate();
   const [activeMode, setActiveMode] = useState(workspaceModes[0].id);
   const [assistantLayout, setAssistantLayout] = useState<"side" | "dock">("side");
 
-  const whyRef = useRef<HTMLElement | null>(null);
-  const useCasesRef = useRef<HTMLElement | null>(null);
-  const faqRef = useRef<HTMLElement | null>(null);
-
   const activeWorkspace = workspaceModes.find((mode) => mode.id === activeMode) ?? workspaceModes[0];
-
-  const scrollTo = (ref: React.RefObject<HTMLElement>) => {
-    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
   return (
     <div className="min-h-screen bg-white text-slate-950 [font-family:'Plus_Jakarta_Sans',ui-sans-serif,system-ui,sans-serif]">
@@ -200,12 +194,12 @@ const Landing = () => {
             <img src="./icon.png" alt="" className="h-8 w-8 rounded-lg" /><span>Dr.Writer</span>
           </button>
           <nav className="hidden items-center gap-8 text-sm text-slate-700 md:flex">
-            <button onClick={() => scrollTo(whyRef as React.RefObject<HTMLElement>)}>Why choose us</button>
-            <button onClick={() => scrollTo(useCasesRef as React.RefObject<HTMLElement>)}>Workspace flow</button>
+            <a href="#features">Why choose us</a>
+            <a href="#workspace">Workspace flow</a>
             <a href="#pricing">Pricing</a>
-            <button onClick={() => scrollTo(faqRef as React.RefObject<HTMLElement>)}>FAQs</button>
+            <a href="#faq">FAQs</a>
           </nav>
-          <Button onClick={() => navigate("/login")} className="rounded-full bg-[#111] px-5 text-white hover:bg-slate-800">Start writing <ArrowRight className="ml-1 h-4 w-4" /></Button>
+          <Button asChild className="rounded-full bg-[#111] px-5 text-white hover:bg-slate-800"><a href="/login">Start writing <ArrowRight className="ml-1 h-4 w-4" /></a></Button>
         </div>
       </header>
       <main>
@@ -215,13 +209,13 @@ const Landing = () => {
             Your space to<br /><span className="hero-words" aria-label="write, refine, and create"><span aria-hidden="true">write</span><span aria-hidden="true">refine</span><span aria-hidden="true">create</span></span><br /><span className="bg-gradient-to-b from-[#111] to-[#999] bg-clip-text text-transparent">with AI by your side.</span>
           </h1>
           <p className="mx-auto mt-7 max-w-xl text-base leading-7 text-neutral-500 sm:text-lg">Write, edit, and collaborate in one place. Dr.Writer brings your documents and AI assistance together, so you can stay focused on the words.</p>
-          <Button onClick={() => navigate("/login")} className="mt-8 h-12 rounded-full bg-[#111] px-7 text-white hover:bg-slate-800">Start writing <ArrowRight className="ml-2 h-4 w-4" /></Button>
+          <Button asChild className="mt-8 h-12 rounded-full bg-[#111] px-7 text-white hover:bg-slate-800"><a href="/login">Start writing <ArrowRight className="ml-2 h-4 w-4" /></a></Button>
           <p className="mt-4 text-sm text-neutral-500">Your ideas, all in one workspace.</p>
           <HeroEditor />
         </section>
 
         {/* Feature grid */}
-        <section ref={whyRef} className="mx-auto max-w-[1320px] px-5 pb-20 pt-20 sm:px-8 sm:pt-28">
+        <section id="features" className="mx-auto max-w-[1320px] px-5 pb-20 pt-20 sm:px-8 sm:pt-28">
           <div className="mx-auto mb-12 max-w-3xl text-center">
             <p className="text-sm text-neutral-500">Features</p>
             <h2 className="mt-4 text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-6xl">A workspace for words.<br /><span className="text-neutral-400">And everything around them.</span></h2>
@@ -286,7 +280,7 @@ const Landing = () => {
         </section>
 
         {/* Workspace modes */}
-        <section ref={useCasesRef} className="mx-auto max-w-[1320px] px-5 py-20 sm:px-8">
+        <section id="workspace" className="mx-auto max-w-[1320px] px-5 py-20 sm:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
               We built the hard part so your writing flow feels easy
@@ -322,7 +316,7 @@ const Landing = () => {
                   <p className="mt-2 text-sm leading-6 text-slate-600">{card.description}</p>
                 </div>
                 <div className="mt-8 overflow-hidden rounded-[1.5rem] border border-white/70 bg-white/80">
-                  <img src={card.image} alt={card.title} className="h-full w-full object-cover" />
+                  <img src={card.image} alt="" width={1000} height={card.height} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 </div>
               </article>
             ))}
@@ -337,14 +331,21 @@ const Landing = () => {
                 </p>
               </div>
               <Button
-                onClick={() => navigate("/login")}
+                asChild
                 variant="outline"
                 className="rounded-full px-5"
               >
-                Open Dr.Writer
-                <ArrowRight className="h-4 w-4" />
+                <a href="/login">Open Dr.Writer <ArrowRight className="h-4 w-4" /></a>
               </Button>
             </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-4xl px-5 py-16 sm:px-8" aria-labelledby="writing-guide">
+          <h2 id="writing-guide" className="text-3xl font-semibold tracking-tight">How to write and collaborate with Dr.Writer</h2>
+          <div className="mt-8 grid gap-8 text-sm leading-7 text-slate-700 md:grid-cols-2">
+            <div><h3 className="text-lg font-semibold text-slate-950">Improve a draft with AI</h3><p className="mt-2">Create or open a document, select an available model, and ask the assistant for help with clarity, tone, or structure. Review its suggestions and edit the document to keep your own voice.</p></div>
+            <div><h3 className="text-lg font-semibold text-slate-950">Work on a document together</h3><p className="mt-2">Create a document and share access with a collaborator. You can work in the same document and see updates as you edit. Export as DOCX or use print preview to save as PDF.</p></div>
           </div>
         </section>
 
@@ -370,7 +371,7 @@ const Landing = () => {
                 <p className="mt-1 text-sm text-neutral-500">{plan.description}</p>
                 <p className="mt-6 text-5xl font-semibold tracking-tight">{plan.price}{plan.price !== "$0" && <span className="text-sm font-normal tracking-normal text-neutral-500"> a month</span>}</p>
                 <p className="mt-2 text-sm text-neutral-500">{plan.detail}</p>
-                <Button onClick={() => navigate("/login")} className="mt-6 h-12 rounded-full bg-[#111] text-white hover:bg-neutral-800">{plan.action}</Button>
+                <Button asChild className="mt-6 h-12 rounded-full bg-[#111] text-white hover:bg-neutral-800"><a href="/login">{plan.action}</a></Button>
                 <ul className="mt-7 space-y-3 text-sm leading-5 text-neutral-700">{plan.features.map(feature => <li key={feature} className="flex gap-2"><span aria-hidden="true">✓</span><span>{feature}</span></li>)}</ul>
               </article>
             ))}
@@ -379,7 +380,7 @@ const Landing = () => {
 
         {/* FAQ + CTA card */}
         <section
-          ref={faqRef}
+          id="faq"
           className="mx-auto grid max-w-[1320px] gap-10 px-5 py-20 sm:px-8 lg:grid-cols-[0.95fr_0.85fr]"
         >
           <div>
@@ -425,16 +426,16 @@ const Landing = () => {
                 <div className="rounded-2xl border border-black/8 bg-[#f7f7f7] p-4">
                   <div className="flex items-center gap-3">
                     <Lock className="h-5 w-5 text-slate-800" />
-                    <span className="text-sm font-medium">Cloud access with a focused, secure workflow</span>
+                    <span className="text-sm font-medium">Cloud access for your document workflow</span>
                   </div>
                 </div>
               </div>
 
               <Button
-                onClick={() => navigate("/login")}
+                asChild
                 className="mt-6 h-12 w-full rounded-full bg-slate-950 text-white hover:bg-slate-800"
               >
-                Continue to workspace
+                <a href="/login">Continue to workspace</a>
               </Button>
             </div>
           </div>
@@ -453,9 +454,9 @@ const Landing = () => {
               Open Dr.Writer to start editing, collaborate in real time, and keep every draft in one
               focused workspace.
             </p>
-            <Button onClick={() => navigate("/login")} className="mt-8 h-12 rounded-full bg-slate-950 px-6 text-white hover:bg-slate-800">
+            <Button asChild className="mt-8 h-12 rounded-full bg-slate-950 px-6 text-white hover:bg-slate-800"><a href="/login">
               Get started
-            </Button>
+            </a></Button>
           </div>
         </section>
       </main>
@@ -474,26 +475,26 @@ const Landing = () => {
           <div className="text-sm text-slate-500">
             <p className="font-semibold text-slate-900">Explore</p>
             <div className="mt-4 space-y-3">
-              <button onClick={() => scrollTo(whyRef as React.RefObject<HTMLElement>)} className="block transition hover:text-slate-900">
+              <a href="#features" className="block transition hover:text-slate-900">
                 Why Dr.Writer
-              </button>
-              <button onClick={() => scrollTo(useCasesRef as React.RefObject<HTMLElement>)} className="block transition hover:text-slate-900">
+              </a>
+              <a href="#workspace" className="block transition hover:text-slate-900">
                 Workspace flow
-              </button>
-              <button onClick={() => scrollTo(faqRef as React.RefObject<HTMLElement>)} className="block transition hover:text-slate-900">
+              </a>
+              <a href="#faq" className="block transition hover:text-slate-900">
                 FAQs
-              </button>
+              </a>
             </div>
           </div>
           <div className="text-sm text-slate-500">
             <p className="font-semibold text-slate-900">Access</p>
             <div className="mt-4 space-y-3">
-              <button onClick={() => navigate("/login")} className="block transition hover:text-slate-900">
+              <a href="/login" className="block transition hover:text-slate-900">
                 Login
-              </button>
-              <button onClick={() => navigate("/login")} className="block transition hover:text-slate-900">
+              </a>
+              <a href="/login" className="block transition hover:text-slate-900">
                 Open workspace
-              </button>
+              </a>
               <p>© {new Date().getFullYear()} Dr.Writer</p>
             </div>
           </div>
