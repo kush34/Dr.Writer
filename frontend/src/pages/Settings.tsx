@@ -12,6 +12,7 @@ import { getDefaultModel, setDefaultModel } from "@/config/models";
 import { ModelSelector } from "@/components/ModelSelector";
 import { McpSettings } from "@/components/McpSettings";
 import { setAutosave, useAutosave } from "@/config/autosave";
+import { notificationsEnabled, notifyUser, requestNotificationPermission, setNotificationsEnabled } from "@/service/notify";
 
 export default function Settings() {
   const side = useSidebarSide();
@@ -19,6 +20,8 @@ export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [model, setModel] = useState(getDefaultModel);
   const [assistantLayout, setAssistantLayout] = useState(() => localStorage.getItem("drwriter.assistantLayout") === "dock" ? "dock" : "sidebar");
+  const [notify, setNotify] = useState(notificationsEnabled);
+  const [permission, setPermission] = useState(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [openRouterConnected, setOpenRouterConnected] = useState(false);
   const [openRouterBusy, setOpenRouterBusy] = useState(true);
@@ -84,6 +87,19 @@ export default function Settings() {
           <Label htmlFor="document-autosave">Document autosave</Label>
           <p className="text-sm text-muted-foreground">Automatically save document changes after you stop editing. This preference is stored in this browser.</p>
           <select id="document-autosave" value={autosave ? "on" : "off"} onChange={(event) => setAutosave(event.target.value === "on")} className="w-full rounded-md border border-input bg-background p-2 text-sm"><option value="off">Off</option><option value="on">On</option></select>
+        </section>
+        <section className="space-y-2 border-t pt-4">
+          <Label htmlFor="ai-notifications">AI sound and notifications</Label>
+          <p className="text-sm text-muted-foreground">Play a sound, and show a browser notification when you are in another tab, when the assistant finishes, needs your answer or fails. This preference is stored in this browser.</p>
+          <select id="ai-notifications" value={notify ? "on" : "off"} onChange={async (event) => {
+            const on = event.target.value === "on";
+            setNotify(on); setNotificationsEnabled(on);
+            if (on) { await requestNotificationPermission(); if (typeof Notification !== "undefined") setPermission(Notification.permission); }
+          }} className="w-full rounded-md border border-input bg-background p-2 text-sm"><option value="on">On</option><option value="off">Off</option></select>
+          {notify && permission === "denied" && <p role="status" className="text-xs text-amber-700 dark:text-amber-300">Browser notifications are blocked for this site, so only the sound will play. Allow notifications in your browser's site settings.</p>}
+          {notify && permission === "unsupported" && <p role="status" className="text-xs text-muted-foreground">This browser does not support notifications, so only the sound will play.</p>}
+          {notify && permission === "default" && <p role="status" className="text-xs text-muted-foreground">Your browser has not been asked for permission yet. Send a test to be asked.</p>}
+          {notify && <Button type="button" variant="outline" size="sm" onClick={async () => { await requestNotificationPermission(); if (typeof Notification !== "undefined") setPermission(Notification.permission); notifyUser("Dr. Writer", "This is a test notification.", true); }}>Send a test</Button>}
         </section>
         <section className="space-y-2 border-t pt-4">
           <Label htmlFor="assistant-layout">Default assistant layout</Label>
