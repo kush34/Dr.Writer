@@ -1,6 +1,6 @@
 import { ZodError, type z } from "zod";
 import { getOpenRouterKey } from "../service/openrouterAuth";
-import { assertClean, cleanSlides, lintDocumentOps, lintSlides } from "../utils/lintEdits";
+import { assertClean, cleanSlides, lintDocumentOps, lintSlides, planSlideOrder } from "../utils/lintEdits";
 import { presentationPlan, presentationDeck } from "../validation/documentSchemas";
 import { Response } from "express";
 import mongoose from "mongoose";
@@ -254,16 +254,19 @@ Allowed operations:
 - {"type":"append","layout":"title|content|section","title":"...","bullets":["..."],"table":{"header":["..."],"rows":[["..."]]}} adds a new slide at the end. layout defaults to "content". Use "title" for an opening slide (title plus an optional one-line "body" subtitle, no bullets) and "section" for a divider. For "content" slides give 3 to 5 "bullets", each a short phrase of at most 12 words with no bullet characters. Use "table" instead of bullets only for comparisons or figures, at most 6 rows. Titles stay under 8 words.
 - {"type":"addText","slide":N,"text":"..."} adds a text box to an existing slide N.
 - {"type":"replace","slide":N,"shape":M,"text":"..."} rewrites existing shape M on existing slide N.
-The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for new slides. Preserve unrelated content. Outline lists the text of each shape in zero-based order; null means non-text. Never target a null shape.
+- {"type":"deleteSlide","slide":N} deletes existing slide N. Use it only when the user asks to remove or condense slides, and never on a slide you also edit.
+- {"type":"moveSlide","slide":N,"to":P} moves existing slide N so it ends at zero-based position P, counted after all deletions and after earlier moves in your list. Use it only when the user asks to reorder.
+The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. Every slide number N always refers to the ORIGINAL numbering, even after other operations. addText, replace, deleteSlide and moveSlide may only use those indexes; use append for new slides. Preserve unrelated content. Outline lists the text of each shape in zero-based order; null means non-text. Never target a null shape.
 ${deck ? `Slide size is ${deck.width}x${deck.height} points. Available layouts: ${deck.layouts.map(layout => `${layout.name} (${layout.type})`).join(", ")}. Slides and their shapes: ${JSON.stringify(deck.slides)}\n` : ""}Example: {"operations":[{"type":"append","layout":"title","title":"Q3 Plan","body":"Priorities and budget"},{"type":"append","title":"Priorities","bullets":["Ship the editor","Cut load time in half","Hire two engineers"]}]}
 Outline: ${JSON.stringify(outline)}
 ${background}Request: ${command}${plan}`, value => {
         const ops = cleanSlides(presentationPlan.parse(value?.operations));
         assertClean(lintSlides(ops));
-        if (ops.some(op => op.type !== "append" && (op.slide >= outline.length || (op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))))) throw new Error("Slide or shape index is invalid");
+        assertClean(planSlideOrder(ops, outline.length).problems);
+        if (ops.some(op => op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))) throw new Error("Slide or shape index is invalid");
         return ops;
       });
-    onPreview(`Proposed slide edits\n${operations.map(op => op.type === "append" ? `Add slide: ${op.title}\n${[op.body, ...(op.bullets ?? []).map(point => `  • ${point}`), op.table ? [op.table.header, ...op.table.rows].map(row => row.join(" | ")).join("\n") : ""].filter(Boolean).join("\n")}` : `Slide ${op.slide + 1}: ${op.text}`).join("\n\n")}`);
+    onPreview(`Proposed slide edits\n${operations.map(op => op.type === "append" ? `Add slide: ${op.title}\n${[op.body, ...(op.bullets ?? []).map(point => `  • ${point}`), op.table ? [op.table.header, ...op.table.rows].map(row => row.join(" | ")).join("\n") : ""].filter(Boolean).join("\n")}` : op.type === "deleteSlide" ? `Delete slide ${op.slide + 1}` : op.type === "moveSlide" ? `Move slide ${op.slide + 1} to position ${op.to + 1}` : `Slide ${op.slide + 1}: ${op.text}`).join("\n\n")}`);
     return { operations };
   }
 

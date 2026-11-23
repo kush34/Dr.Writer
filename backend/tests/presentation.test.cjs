@@ -70,3 +70,38 @@ test("slide edits accept layouts, bullets and tables and the prompt describes th
   assert.deepEqual(result.operations, plan);
   assert.ok(seen.includes("960x540") && seen.includes("Title and Content (obj)") && seen.includes('"bullets"'));
 });
+
+test("slide delete and move edits are planned against the original numbering", async t => {
+  const { presentationPlan } = require("../dist/validation/documentSchemas");
+  const { planSlideOrder } = require("../dist/utils/lintEdits");
+  const del = slide => ({ type: "deleteSlide", slide });
+  const move = (slide, to) => ({ type: "moveSlide", slide, to });
+  assert.ok(presentationPlan.safeParse([del(1), move(3, 0)]).success);
+  assert.ok(!presentationPlan.safeParse([{ type: "moveSlide", slide: 1 }]).success);
+  assert.ok(!presentationPlan.safeParse([{ type: "deleteSlide", slide: -1 }]).success);
+
+  assert.deepEqual(planSlideOrder([del(1), del(3), move(4, 0)], 5).order, [4, 0, 2]);
+  assert.deepEqual(planSlideOrder([move(0, 2)], 3).order, [1, 2, 0]);
+  assert.deepEqual(planSlideOrder([move(0, 1), move(2, 0)], 3).order, [2, 1, 0]);
+  const bad = (ops, count) => planSlideOrder(ops, count).problems.join(" | ");
+  assert.match(bad([del(5)], 3), /does not exist/);
+  assert.match(bad([del(1), del(1)], 3), /already deleted/);
+  assert.match(bad([del(1), move(1, 0)], 3), /deleted and also edited or moved/);
+  assert.match(bad([del(1), { type: "addText", slide: 1, text: "x" }], 3), /deleted and also edited or moved/);
+  assert.match(bad([move(0, 3)], 3), /last position is 2/);
+  assert.match(bad([del(0), del(1)], 2), /every slide/);
+  assert.equal(bad([del(0), del(1), { type: "append", title: "New", bullets: ["x"] }], 2), "");
+
+  t.mock.method(Document, "findById", async () => ({ kind: "presentation", revision: 0, user_id: "owner", users: [] }));
+  t.mock.method(auth, "getOpenRouterKey", async () => undefined);
+  const prompts = [];
+  const replies = [[del(0), del(1), del(2)], [del(1), move(2, 0)]];
+  t.mock.method(router, "openRouterComplete", async prompt => { prompts.push(prompt); return JSON.stringify({ operations: replies.shift() }); });
+  const previews = [];
+  const result = await performDocumentAction("owner", "deck", "Drop slide 2 and lead with the last one", undefined, "m", [["One"], ["Two"], ["Three"]], () => {}, text => previews.push(text));
+  assert.deepEqual(result.operations, [del(1), move(2, 0)]);
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[0], /deleteSlide/);
+  assert.match(prompts[1], /delete every slide/);
+  assert.match(previews.at(-1), /Delete slide 2\n\nMove slide 3 to position 1/);
+});

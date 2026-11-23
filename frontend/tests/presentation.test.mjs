@@ -28,3 +28,25 @@ test("AI edits round-trip with manual edits intact and stale or invalid batches 
   const appendedShapes = reopened.host.execute({ operations: [{ op: "listShapes", container: slides[1] }] }).results[0].value.handles;
   assert.equal(appendedShapes.length, 2);
 });
+
+test("deleteSlide and moveSlide use original slide numbers and survive a save round-trip", () => {
+  const bytes = readFileSync(new URL("../src/assets/blank.pptx", import.meta.url));
+  const { host } = createServerAutomationHost(bytes);
+  applyPresentationEdits(host, host.revision(), ["B", "C", "D", "E"].map(title => ({ type: "append", title })));
+  // Original slides are numbered 0..4. Delete 1 and 3, move original slide 4 to the front, edit slide 2 meanwhile.
+  const before = readOutline(host);
+  const edit = [
+    { type: "deleteSlide", slide: 1 },
+    { type: "deleteSlide", slide: 3 },
+    { type: "moveSlide", slide: 4, to: 0 },
+    { type: "addText", slide: 2, text: "note" },
+  ];
+  applyPresentationEdits(host, host.revision(), edit);
+  const after = readOutline(host).map(slide => slide.filter(Boolean));
+  assert.equal(after.length, before.length - 2);
+  assert.deepEqual(after.map(slide => slide[0]), [before[4].find(Boolean), before[0].find(Boolean), before[2].find(Boolean)]);
+  assert.ok(after[2].includes("note"));
+  const reopened = createServerAutomationHost(host.save().bytes);
+  assert.equal(readOutline(reopened.host).length, 3);
+  assert.throws(() => applyPresentationEdits(host, host.revision(), [{ type: "deleteSlide", slide: 9 }]));
+});

@@ -26,6 +26,8 @@ export const presentationPlan = z.array(z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("replace"), slide: z.number().int().nonnegative(), shape: z.number().int().nonnegative(), text: z.string().max(4000) }),
   z.object({ type: z.literal("addText"), slide: z.number().int().nonnegative(), text: z.string().min(1).max(4000) }),
+  z.object({ type: z.literal("deleteSlide"), slide: z.number().int().nonnegative() }),
+  z.object({ type: z.literal("moveSlide"), slide: z.number().int().nonnegative(), to: z.number().int().nonnegative() }),
 ])).min(1).max(60).superRefine((ops, ctx) => {
   ops.forEach((op, index) => {
     if (op.type === "append" && !(op.body?.trim() || op.bullets?.length || op.table || op.layout === "title" || op.layout === "section"))

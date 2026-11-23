@@ -3,7 +3,9 @@ import type { AutomationHost, AutomationOperation } from "@pptx-editor.dev/core/
 export type SlideLayoutHint = "title" | "content" | "section";
 export type Edit = { type: "append"; title: string; body?: string; bullets?: string[]; layout?: SlideLayoutHint; table?: { header: string[]; rows: string[][] } }
   | { type: "addText"; slide: number; text: string }
-  | { type: "replace"; slide: number; shape: number; text: string };
+  | { type: "replace"; slide: number; shape: number; text: string }
+  | { type: "deleteSlide"; slide: number }
+  | { type: "moveSlide"; slide: number; to: number };
 
 type Layout = { id: string; name: string; type: string | null };
 type Box = { left: number; top: number; width: number; height: number };
@@ -135,6 +137,12 @@ export function applyPresentationEdits(host: AutomationHost, revision: number, e
     if (bullets) push({ op: "setParagraph", shape, paragraph: { bulletVisible: true, bulletType: "char" } });
     return shape;
   };
+  // Slide numbers in edits always mean the ORIGINAL deck. Bind every slide that is deleted or moved up front,
+  // so the handles stay valid while earlier deletes and moves shift positions.
+  const bound = new Map<number, { result: number }>();
+  for (const edit of edits)
+    if ((edit.type === "deleteSlide" || edit.type === "moveSlide") && !bound.has(edit.slide))
+      bound.set(edit.slide, push({ op: "getSlide", key: { index: edit.slide } }));
   const bodySize = Math.round(height * 0.042);
   const titleSize = Math.round(height * 0.075);
 
@@ -145,6 +153,7 @@ export function applyPresentationEdits(host: AutomationHost, revision: number, e
       push({ op: "setText", shape, text: edit.text });
       continue;
     }
+    if (edit.type === "deleteSlide" || edit.type === "moveSlide") continue;
     if (edit.type === "addText") {
       const slide = push({ op: "getSlide", key: { index: edit.slide } });
       textBox(slide, edit.text, grid.body, { size: bodySize });
@@ -182,6 +191,9 @@ export function applyPresentationEdits(host: AutomationHost, revision: number, e
       for (let column = 0; column < edit.table.header.length; column++) push({ op: "setFont", shape: table, cell: { row: 0, column }, font: { bold: true } });
     }
   }
+  // Structure changes go last so text edits and appends above still see the original numbering: deletes, then moves in order.
+  for (const edit of edits) if (edit.type === "deleteSlide") push({ op: "deleteSlide", slide: bound.get(edit.slide)! });
+  for (const edit of edits) if (edit.type === "moveSlide") push({ op: "moveSlide", slide: bound.get(edit.slide)!, index: edit.to });
   if (!operations.length || !host.execute({ operations, expectedRevision: revision }).ok)
     throw new Error("Slides changed or an edit was invalid. Request the edit again.");
 }
