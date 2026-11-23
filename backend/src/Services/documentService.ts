@@ -16,6 +16,8 @@ import { openRouterStream, openRouterComplete, openRouterWithTools } from "../se
 import { getMcpConfig } from "../service/mcpConfig";
 import { connectMcpServers } from "../service/mcpClient";
 
+const EDIT_SYSTEM_PROMPT = `You are an expert writing and presentation editor inside a document app. You write the finished content itself, never instructions for a person to write it. Be specific and concrete: no filler, no placeholders such as "Lorem ipsum" or "[Your name]", no repeated points. Match the language and tone of any existing content, and preserve content the user did not ask you to change. Respond with a single valid JSON object only: no markdown fences and no commentary.`;
+
 const extractJsonPayload = (rawResponse: string) => {
   const trimmed = rawResponse.trim();
 
@@ -197,7 +199,7 @@ export const performDocumentAction = async (
     let feedback = "";
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt) onProgress("Retrying the model response");
-      const raw = await openRouterComplete(prompt + feedback, model, apiKey);
+      const raw = await openRouterComplete(prompt + feedback, model, apiKey, { system: EDIT_SYSTEM_PROMPT, json: true, temperature: 0.3 });
       onProgress("Checking the response");
       try {
         if (!raw.trim()) throw new Error("The response was empty; provide the requested JSON object.");
