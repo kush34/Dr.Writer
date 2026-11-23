@@ -11,6 +11,8 @@ export type tFile = {
   createdAt?: string;
   uploadStatus?: string;
   pending?: boolean;
+  owned?: boolean;
+  sharedBy?: string;
 };
 
 export default function FileCard({ file, view }: { file: tFile; view: "card" | "list" }) {
@@ -31,6 +33,7 @@ export default function FileCard({ file, view }: { file: tFile; view: "card" | "
     <div className={view === "card" ? "p-3" : "min-w-0 flex-1"}>
       <div className="truncate font-medium">{file.title}</div>
       {date && !Number.isNaN(date.getTime()) && <div className="mt-1 text-xs text-muted-foreground">{file.editedAt ? "Edited" : "Created"} <time dateTime={date.toISOString()}>{date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time></div>}
+      {file.owned === false && <div className="mt-1 truncate text-xs text-muted-foreground">Shared by {file.sharedBy ?? "someone"}</div>}
       {status && <div className="mt-1 text-xs text-muted-foreground">{status}</div>}
     </div>
   </>;

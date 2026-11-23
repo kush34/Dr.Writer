@@ -89,9 +89,13 @@ export const createDocument = async (userId: string, title: string, kind: "docum
 };
 
 export const getDocumentList = async (userId: string) => {
-  const documents = await Document.find({ user_id: userId }).select(
-    "kind title content createdAt editedAt uploadStatus uploadError sourceFileName"
+  const documents = await Document.find({ $or: [{ user_id: userId }, { users: userId }] }).select(
+    "kind title content createdAt editedAt uploadStatus uploadError sourceFileName user_id"
   ).lean();
+  // Documents shared with this user carry the owner's name, so Home can say who shared them.
+  const sharedOwnerIds = [...new Set(documents.filter(document => !isDocumentOwner(userId, document.user_id)).map(document => String(document.user_id)))];
+  const owners = sharedOwnerIds.length ? await User.find({ _id: { $in: sharedOwnerIds } }).select("name email").lean() : [];
+  const ownerLabel = new Map(owners.map(owner => [String(owner._id), owner.name || owner.email || "Someone"]));
   const previewText = (content: unknown): string => {
     if (typeof content === "string") return content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
     const words: string[] = [];
@@ -103,7 +107,10 @@ export const getDocumentList = async (userId: string) => {
     visit(content);
     return words.join(" ").slice(0, 300);
   };
-  return documents.map(({ content, ...document }) => ({ ...document, preview: previewText(content) }));
+  return documents.map(({ content, user_id, ...document }) => {
+    const owned = isDocumentOwner(userId, user_id);
+    return { ...document, owned, ...(owned ? {} : { sharedBy: ownerLabel.get(String(user_id)) ?? "Someone" }), preview: previewText(content) };
+  });
 };
 
 export const searchDocuments = async (userId: string, query: string) => {
