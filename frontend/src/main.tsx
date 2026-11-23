@@ -9,6 +9,7 @@ import { UserContextProvider } from './context/UserContext';
 import { CommandSearch } from './components/CommandSearch';
 import { Analytics } from "@vercel/analytics/react";
 import { PageSkeleton } from './components/PageSkeleton';
+import { AppErrorBoundary, ErrorPage, RouteError } from './components/ErrorPage';
 
 // Lazy imports
 const App = lazy(() => import('./App'));
@@ -35,6 +36,7 @@ function ThemedRoutes() {
 
 const root = document.getElementById("root");
 const router = createBrowserRouter(createRoutesFromElements(
+  <Route errorElement={<RouteError />}>
   <Route element={<UserContextProvider><Suspense fallback={<PageSkeleton />}><Outlet /></Suspense></UserContextProvider>}>
     <Route path="/" element={<Landing />} />
     <Route path="/login" element={<App />} />
@@ -44,10 +46,13 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="/home/:id" element={<EditorPage />} />
     </Route>
   </Route>
+  <Route path="*" element={<ErrorPage notFound />} />
+  </Route>
 ));
 
 if (root) {
   ReactDOM.createRoot(root).render(
+    <AppErrorBoundary>
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <QueryClientProvider client={queryClient}>
             <RouterProvider router={router} />
@@ -62,5 +67,6 @@ if (root) {
             }} />
       </QueryClientProvider >
     </ThemeProvider>
+    </AppErrorBoundary>
   );
 }

@@ -90,3 +90,7 @@
 .collaborator-avatar:first-child { margin-left: 0; }
 @media (hover: hover) and (pointer: fine) { .collaborator-avatar:hover { z-index: 1; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .collaborator-avatar { transition: none; } .collaborator-avatar:hover { transform: none; } }
+
+.landing-nav { transition: transform 200ms cubic-bezier(.23, 1, .32, 1); }
+.landing-nav-hidden:not(:focus-within) { transform: translateY(-100%); }
+@media (prefers-reduced-motion: reduce) { .landing-nav { transition: none; } }

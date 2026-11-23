@@ -183,12 +183,29 @@ const faqs = [
 const Landing = () => {
   const [activeMode, setActiveMode] = useState(workspaceModes[0].id);
   const [assistantLayout, setAssistantLayout] = useState<"side" | "dock">("side");
+  const [navHidden, setNavHidden] = useState(false);
+
+  useEffect(() => {
+    let previous = Math.max(0, window.scrollY);
+    const onScroll = () => {
+      const current = Math.max(0, window.scrollY);
+      if (current < 64) {
+        setNavHidden(false);
+        previous = current;
+      } else if (Math.abs(current - previous) >= 8) {
+        setNavHidden(current > previous);
+        previous = current;
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const activeWorkspace = workspaceModes.find((mode) => mode.id === activeMode) ?? workspaceModes[0];
 
   return (
     <div className="min-h-screen bg-white text-slate-950 [font-family:'Plus_Jakarta_Sans',ui-sans-serif,system-ui,sans-serif]">
-      <header className="relative z-50 bg-white px-4 pt-3 sm:px-8">
+      <header className={`landing-nav sticky top-0 z-50 bg-white px-4 pt-3 sm:px-8 ${navHidden ? "landing-nav-hidden" : ""}`}>
         <div className="mx-auto flex max-w-[1256px] items-center justify-between gap-6 rounded-full bg-[#f2f2f2] px-3 py-2 sm:px-5">
           <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-2 text-sm font-bold tracking-tight">
             <img src="./icon.png" alt="" className="h-8 w-8 rounded-lg" /><span>Dr.Writer</span>
@@ -338,22 +355,6 @@ const Landing = () => {
                 <a href="/login">Open Dr.Writer <ArrowRight className="h-4 w-4" /></a>
               </Button>
             </div>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-4xl px-5 py-16 sm:px-8" aria-labelledby="writing-guide">
-          <h2 id="writing-guide" className="text-3xl font-semibold tracking-tight">How to write and collaborate with Dr.Writer</h2>
-          <div className="mt-8 grid gap-8 text-sm leading-7 text-slate-700 md:grid-cols-2">
-            <div><h3 className="text-lg font-semibold text-slate-950">Improve a draft with AI</h3><p className="mt-2">Create or open a document, select an available model, and ask the assistant for help with clarity, tone, or structure. Review its suggestions and edit the document to keep your own voice.</p></div>
-            <div><h3 className="text-lg font-semibold text-slate-950">Work on a document together</h3><p className="mt-2">Create a document and share access with a collaborator. You can work in the same document and see updates as you edit. Export as DOCX or use print preview to save as PDF.</p></div>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-4xl px-5 pb-20 sm:px-8" aria-labelledby="guides-heading">
-          <h2 id="guides-heading" className="text-3xl font-semibold tracking-tight">Writing guides</h2>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <a href="/guides/improve-a-draft-with-ai/" className="rounded-2xl bg-[#f3f3f3] p-6 hover:bg-neutral-200"><h3 className="text-lg font-semibold">How to improve a first draft with AI →</h3><p className="mt-2 text-sm leading-6 text-neutral-600">Ask focused questions, review edits, and keep your voice.</p></a>
-            <a href="/guides/collaborate-on-a-document/" className="rounded-2xl bg-[#f3f3f3] p-6 hover:bg-neutral-200"><h3 className="text-lg font-semibold">How to collaborate on a document →</h3><p className="mt-2 text-sm leading-6 text-neutral-600">Share access, coordinate reviews, and deliver a final version.</p></a>
           </div>
         </section>
 
