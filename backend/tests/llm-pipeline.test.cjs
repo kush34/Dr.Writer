@@ -114,3 +114,41 @@ test('OpenRouter completion sends system prompt, JSON mode, token cap and temper
   assert.equal(body.messages.length, 1);
   assert.equal(body.response_format, undefined);
 });
+
+test('markdown round-trips through TipTap and keeps inline formatting', () => {
+  const { markdownToNodes, documentToMarkdownBlocks } = require('../dist/utils/markdown');
+  const nodes = markdownToNodes('# Title\n\nHello **bold** and *it* with `code` and [a link](https://x.com).\n\n- one\n  - nested\n- two\n\n1. first\n2. second\n\n> quote\n\n---\n\n```js\nlet a = 1;\n```');
+  assert.deepEqual(nodes.map(n => n.type), ['heading', 'paragraph', 'bulletList', 'orderedList', 'blockquote', 'horizontalRule', 'codeBlock']);
+  const marks = nodes[1].content.filter(n => n.marks).map(n => n.marks[0].type);
+  assert.deepEqual(marks, ['bold', 'italic', 'code', 'link']);
+  assert.equal(nodes[2].content[0].content[1].type, 'bulletList');
+  assert.equal(nodes[2].content.length, 2);
+  assert.equal(markdownToNodes('snake_case_word and 2 * 3 * 4').length, 1);
+  assert.equal(markdownToNodes('[bad](javascript:alert(1))')[0].content.some(n => n.marks), false);
+  const { text, locked } = documentToMarkdownBlocks({ content: [...nodes, { type: 'image', attrs: { src: 'x' } }] });
+  assert.match(text, /^\[0\] # Title\n\[1\] Hello \*\*bold\*\* and \*it\* with `code` and \[a link\]\(https:\/\/x\.com\)\./);
+  assert.match(text, /\[2\] - one\n {2}- nested\n- two/);
+  assert.deepEqual([...locked], [7]);
+  const again = markdownToNodes(text.split('\n').slice(1, 2).join('\n').replace(/^\[\d+\] /, ''));
+  assert.equal(again[0].type, 'paragraph');
+});
+
+test('markdown edit operations are applied and locked blocks are protected', async t => {
+  const Document = require('../dist/Models/documentModel').default;
+  const auth = require('../dist/service/openrouterAuth');
+  const router = require('../dist/service/openrouter');
+  const { performDocumentAction } = require('../dist/Services/documentService');
+  const content = { type: 'doc', content: [{ type: 'image', attrs: { src: 'x' } }, { type: 'paragraph', content: [{ type: 'text', text: 'Old' }] }] };
+  t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', content }));
+  t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  let calls = 0;
+  t.mock.method(router, 'openRouterComplete', async prompt => {
+    assert.match(prompt, /\[0\] <image block: not editable/);
+    return ++calls === 1
+      ? JSON.stringify({ operations: [{ type: 'delete', from: 0, to: 0 }] })
+      : JSON.stringify({ operations: [{ type: 'replace', from: 1, to: 1, markdown: '## New\n\nBody with **bold**.\n\n- a\n- b' }] });
+  });
+  const result = await performDocumentAction('owner', 'doc', 'rewrite', content, 'model');
+  assert.equal(calls, 2);
+  assert.deepEqual(result.updatedContent.content.map(n => n.type), ['image', 'heading', 'paragraph', 'bulletList']);
+});
