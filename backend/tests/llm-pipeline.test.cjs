@@ -100,3 +100,17 @@ test('OpenRouter completion handles missing and text-part content', async t => {
   fetchMock.mock.mockImplementation(async () => new Response(JSON.stringify({ choices: [{ message: { content: [{ type: 'text', text: '{"ok":true}' }] } }] }), { status: 200 }));
   assert.equal(await openRouterComplete('prompt', 'model'), '{"ok":true}');
 });
+
+test('OpenRouter completion sends system prompt, JSON mode, token cap and temperature', async t => {
+  const { openRouterComplete } = require('../dist/service/openrouter');
+  let body;
+  t.mock.method(globalThis, 'fetch', async (_url, init) => (body = JSON.parse(init.body), new Response(JSON.stringify({ choices: [{ message: { content: '{}' } }] }), { status: 200 })));
+  await openRouterComplete('prompt', 'model', undefined, { system: 'rules', json: true, temperature: 0.3 });
+  assert.deepEqual(body.messages, [{ role: 'system', content: 'rules' }, { role: 'user', content: 'prompt' }]);
+  assert.deepEqual(body.response_format, { type: 'json_object' });
+  assert.equal(body.temperature, 0.3);
+  assert.ok(body.max_tokens > 0);
+  await openRouterComplete('prompt', 'model');
+  assert.equal(body.messages.length, 1);
+  assert.equal(body.response_format, undefined);
+});
