@@ -3,6 +3,7 @@ import { getOpenRouterKey } from "../service/openrouterAuth";
 import { assertClean, cleanSlides, lintDocumentOps, lintSlides } from "../utils/lintEdits";
 import { presentationPlan, presentationDeck } from "../validation/documentSchemas";
 import { Response } from "express";
+import mongoose from "mongoose";
 import { documentText, searchExcerpt } from "../utils/documentSearch";
 import cloudinary from "../Config/cloudinary";
 import User from "../Models/userModel";
@@ -179,6 +180,15 @@ export const addUserToDocument = async (
   });
 };
 
+/** Earlier edit requests on this document, so "make it shorter" or "now the next section" keep their meaning. Optional context: any failure just means none. */
+const recentRequests = async (documentId: string) => {
+  if (mongoose.connection.readyState !== 1) return "";
+  try {
+    const chats = await Chat.find({ documentId }).sort({ createdAt: -1, _id: -1 }).limit(4).lean();
+    return chats.reverse().map(chat => `- User: ${String(chat.prompt).slice(0, 300)}\n  Result: ${String(chat.response).slice(0, 200)}`).join("\n");
+  } catch { return ""; }
+};
+
 export const performDocumentAction = async (
   userId: string,
   documentId: string,
@@ -198,6 +208,8 @@ export const performDocumentAction = async (
 
   const apiKey = await getOpenRouterKey(userId);
   const model = modelName || "openai/gpt-4o-mini";
+  const history = await recentRequests(documentId);
+  const background = `Document title: ${JSON.stringify(String(document.title ?? "").slice(0, 200))}${history ? `\nEarlier requests on this document, oldest first (for context only; do not redo them):\n${history}` : ""}\n`;
   const completeValidated = async <T>(prompt: string, validate: (value: any) => T): Promise<T> => {
     let feedback = "";
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -245,7 +257,7 @@ Allowed operations:
 The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for new slides. Preserve unrelated content. Outline lists the text of each shape in zero-based order; null means non-text. Never target a null shape.
 ${deck ? `Slide size is ${deck.width}x${deck.height} points. Available layouts: ${deck.layouts.map(layout => `${layout.name} (${layout.type})`).join(", ")}. Slides and their shapes: ${JSON.stringify(deck.slides)}\n` : ""}Example: {"operations":[{"type":"append","layout":"title","title":"Q3 Plan","body":"Priorities and budget"},{"type":"append","title":"Priorities","bullets":["Ship the editor","Cut load time in half","Hire two engineers"]}]}
 Outline: ${JSON.stringify(outline)}
-Request: ${command}${plan}`, value => {
+${background}Request: ${command}${plan}`, value => {
         const ops = cleanSlides(presentationPlan.parse(value?.operations));
         assertClean(lintSlides(ops));
         if (ops.some(op => op.type !== "append" && (op.slide >= outline.length || (op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))))) throw new Error("Slide or shape index is invalid");
@@ -287,7 +299,7 @@ Markdown may use: # ## ### headings, paragraphs separated by a blank line, "- " 
 Never replace or delete blocks shown as <... not editable>. Keep unrelated blocks unchanged and do not repeat text that already exists. For a new document, use a clear structure with headings, short paragraphs and lists where they help. Do not overlap edits or reuse a start index.
 Example, filling an empty document: {"operations":[{"type":"replace","from":0,"to":0,"markdown":"# Title\\n\\nA useful opening paragraph.\\n\\n- First point\\n- Second point"}]}
 Example, appending: {"operations":[{"type":"insert","at":${blockCount},"markdown":"## New section\\n\\nNew paragraph."}]}
-Document:
+${background}Document:
 ${documentMarkdown || "(empty)"}
 Command: ${command}${documentPlan}`, value => {
       if (typeof value?.question === "string" && value.question.trim() && (!value.operations || (Array.isArray(value.operations) && !value.operations.length))) return { question: value.question.trim(), operations: [] };
