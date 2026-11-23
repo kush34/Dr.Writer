@@ -1,5 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { mockBalance } = require('./meter-helper.cjs');
 const { validateDocumentOperations } = require('../dist/utils/llmActions');
 const { applyEdits } = require('../dist/utils/applyEdits');
 
@@ -23,6 +24,7 @@ test('invalid model edits are repaired before they are applied', async t => {
   const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original' }] }] };
   t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', content }));
   t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  mockBalance(t, 1_000_000);
   let calls = 0;
   const complete = t.mock.method(router, 'openRouterComplete', async prompt => ++calls === 1
     ? JSON.stringify({ operations: [{ type: 'delete', from: 9, to: 9 }] })
@@ -42,6 +44,7 @@ test('previews a validated outline and proposed edits before returning', async t
   const content = { type: 'doc', content: [{ type: 'paragraph' }] };
   t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', content }));
   t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  mockBalance(t, 1_000_000);
   let calls = 0;
   t.mock.method(router, 'openRouterComplete', async () => ++calls === 1
     ? JSON.stringify({ audience: 'Readers', goal: 'Explain', sections: [{ heading: 'Intro', purpose: 'Context' }] })
@@ -61,6 +64,7 @@ test('an invalid outline does not prevent a valid direct edit', async t => {
   const content = { type: 'doc', content: [{ type: 'paragraph' }] };
   t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', content }));
   t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  mockBalance(t, 1_000_000);
   let calls = 0;
   t.mock.method(router, 'openRouterComplete', async () => ++calls <= 3 ? '{}' : JSON.stringify({ operations: [{ type: 'insert', at: 1, text: 'Hello' }] }));
   const result = await performDocumentAction('owner', 'doc', 'write', content, 'model');
@@ -77,6 +81,7 @@ test('empty model output is retried and does not hide provider errors', async t 
   const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Existing' }] }] };
   t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', content }));
   t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  mockBalance(t, 1_000_000);
   let calls = 0;
   const complete = t.mock.method(router, 'openRouterComplete', async prompt => {
     calls++;
@@ -141,6 +146,7 @@ test('markdown edit operations are applied and locked blocks are protected', asy
   const content = { type: 'doc', content: [{ type: 'image', attrs: { src: 'x' } }, { type: 'paragraph', content: [{ type: 'text', text: 'Old' }] }] };
   t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', content }));
   t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  mockBalance(t, 1_000_000);
   let calls = 0;
   t.mock.method(router, 'openRouterComplete', async prompt => {
     assert.match(prompt, /\[0\] <image block: not editable/);
@@ -176,6 +182,7 @@ test('placeholder output is sent back to the model and corrected on retry', asyn
   const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original' }] }] };
   t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', content }));
   t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  mockBalance(t, 1_000_000);
   const prompts = [];
   const replies = ['{"operations":[{"type":"insert","at":1,"markdown":"Lorem ipsum dolor sit amet"}]}', '{"operations":[{"type":"insert","at":1,"markdown":"A real sentence."}]}'];
   t.mock.method(router, 'openRouterComplete', async prompt => { prompts.push(prompt); return replies.shift(); });
@@ -195,6 +202,7 @@ test('edit prompts include the document title and recent requests', async t => {
   const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original' }] }] };
   t.mock.method(Document, 'findById', async () => ({ user_id: 'owner', kind: 'document', title: 'Quarterly report', content }));
   t.mock.method(auth, 'getOpenRouterKey', async () => undefined);
+  mockBalance(t, 1_000_000);
   Object.defineProperty(mongoose.connection, 'readyState', { configurable: true, get: () => 1 });
   t.after(() => { delete mongoose.connection.readyState; });
   const query = { sort: () => query, limit: () => query, lean: async () => [{ prompt: 'Add a summary', response: 'Applied' }, { prompt: 'Shorten it', response: 'Applied' }] };

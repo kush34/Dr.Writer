@@ -1,5 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const { mockBalance } = require("./meter-helper.cjs");
 const Document = require("../dist/Models/documentModel").default;
 const router = require("../dist/service/openrouter");
 const auth = require("../dist/service/openrouterAuth");
@@ -26,6 +27,7 @@ test("presentation actions and saves enforce document access, kind, and revision
     return { modifiedCount: 1 };
   });
   t.mock.method(auth, "getOpenRouterKey", async () => undefined);
+  mockBalance(t, 1_000_000);
   const plan = [{ type: "append", title: "Overview", body: "Project status" }];
   const model = t.mock.method(router, "openRouterComplete", async (prompt, name) => {
     assert.ok(prompt.includes("First slide"));
@@ -64,6 +66,7 @@ test("slide edits accept layouts, bullets and tables and the prompt describes th
 
   t.mock.method(Document, "findById", async () => ({ kind: "presentation", revision: 0, user_id: "owner", users: [] }));
   t.mock.method(auth, "getOpenRouterKey", async () => undefined);
+  mockBalance(t, 1_000_000);
   let seen = "";
   t.mock.method(router, "openRouterComplete", async prompt => { seen = prompt; return JSON.stringify({ operations: plan }); });
   const result = await performDocumentAction("owner", "deck", "Add a plan", undefined, "m", [["First slide"]], () => {}, () => {}, deck);
@@ -94,6 +97,7 @@ test("slide delete and move edits are planned against the original numbering", a
 
   t.mock.method(Document, "findById", async () => ({ kind: "presentation", revision: 0, user_id: "owner", users: [] }));
   t.mock.method(auth, "getOpenRouterKey", async () => undefined);
+  mockBalance(t, 1_000_000);
   const prompts = [];
   const replies = [[del(0), del(1), del(2)], [del(1), move(2, 0)]];
   t.mock.method(router, "openRouterComplete", async prompt => { prompts.push(prompt); return JSON.stringify({ operations: replies.shift() }); });

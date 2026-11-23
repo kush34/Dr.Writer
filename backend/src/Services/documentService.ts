@@ -192,6 +192,33 @@ const recentRequests = async (documentId: string) => {
 export const performDocumentAction = async (
   userId: string,
   documentId: string,
+const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+
+/**
+ * Runs one model call for a user without their own OpenRouter key, charging their token balance.
+ * The worst case (prompt plus the maximum reply) is reserved first, so a user without enough balance
+ * is refused with 402 before anything reaches the server's key. Afterwards the reservation is settled
+ * to the estimated real usage (length/4, as in streamUserPrompt), or refunded if the call failed.
+ */
+const meteredCall = async (userId: string, prompt: string, system: string, call: () => Promise<string>) => {
+  const promptTokens = estimateTokens(prompt) + estimateTokens(system);
+  const hold = promptTokens + MAX_TOKENS_PER_REQUEST;
+  const reservedUser = await User.findOneAndUpdate(
+    { _id: userId, token_balance: { $gte: hold } },
+    { $inc: { token_balance: -hold } },
+    { new: true }
+  );
+  if (!reservedUser) throw new AppError(402, "Insufficient token balance. Add your own OpenRouter key in settings or try again later.");
+  let used = 0;
+  try {
+    const raw = await call();
+    used = promptTokens + estimateTokens(raw);
+    return raw;
+  } finally {
+    await User.updateOne({ _id: userId }, { $inc: { token_balance: hold - used } });
+  }
+};
+
   command: string,
   currentContent?: { type: "doc"; content: unknown[] },
   modelName?: string,
@@ -214,7 +241,10 @@ export const performDocumentAction = async (
     let feedback = "";
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt) onProgress("Retrying the model response");
-      const raw = await openRouterComplete(prompt + feedback, model, apiKey, { system: EDIT_SYSTEM_PROMPT, json: true, temperature: 0.3 });
+      const fullPrompt = prompt + feedback;
+      const call = () => openRouterComplete(fullPrompt, model, apiKey, { system: EDIT_SYSTEM_PROMPT, json: true, temperature: 0.3 });
+      // Users with their own key pay OpenRouter directly; everyone else is metered on every attempt.
+      const raw = apiKey ? await call() : await meteredCall(userId, fullPrompt, EDIT_SYSTEM_PROMPT, call);
       onProgress("Checking the response");
       try {
         if (!raw.trim()) throw new Error("The response was empty; provide the requested JSON object.");
