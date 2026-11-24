@@ -86,21 +86,6 @@ const assertCanEdit = (role: DocumentRole | null) => {
   if (!canEditRole(role)) throw new AppError(403, "You have view-only access to this document");
 };
 
-export const getTestDocument = async () => {
-  const testFileId = process.env.testFile;
-
-  if (!testFileId) {
-    throw new AppError(500, "Test document is not configured");
-  }
-
-  const document = await Document.findById(testFileId);
-  if (!document) {
-    throw new AppError(404, "Document not found!");
-  }
-
-  return document;
-};
-
 export const createDocument = async (userId: string, title: string, kind: "document" | "presentation" = "document", pptx?: string) => {
   return Document.create({
     title, kind, pptx,

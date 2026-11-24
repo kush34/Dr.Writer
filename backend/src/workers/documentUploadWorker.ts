@@ -1,5 +1,5 @@
 import fs from "fs";
-import mammoth from "mammoth";
+import { docxToTiptap } from "../utils/docxImport";
 import connectDB from "../Config/database";
 import Document from "../Models/documentModel";
 
@@ -9,17 +9,26 @@ type UploadQueueJob = {
   originalName: string;
 };
 
+// process.exit can drop an IPC message that is still in flight, so wait for the send to finish.
+const report = (message: object) =>
+  new Promise<void>((resolve) => {
+    if (!process.send) return resolve();
+    process.send(message, () => resolve());
+  });
+
+// The stored message reaches the user. Parser errors can contain internals, so they are only logged.
+const UPLOAD_FAILED_MESSAGE = "Could not read this .docx file. It may be corrupted or unsupported.";
+
 const failUpload = async (documentId: string, error: unknown) => {
-  const message = error instanceof Error ? error.message : "Upload processing failed";
+  const detail = error instanceof Error ? error.message : "Upload processing failed";
 
   await Document.findByIdAndUpdate(documentId, {
     uploadStatus: "failed",
-    uploadError: message,
+    uploadError: UPLOAD_FAILED_MESSAGE,
+    uploadFilePath: null,
   });
 
-  if (process.send) {
-    process.send({ type: "failed", documentId, error: message });
-  }
+  await report({ type: "failed", documentId, error: detail });
 };
 
 const cleanupUploadFile = (filePath: string) => {
@@ -32,26 +41,20 @@ process.on("message", async (job: UploadQueueJob) => {
   try {
     await connectDB();
 
-    await Document.findByIdAndUpdate(job.documentId, {
-      uploadStatus: "processing",
-      uploadError: null,
-    });
-
     const fileContent = fs.readFileSync(job.filePath);
-    const { value: text } = await mammoth.extractRawText({ buffer: fileContent });
+    const content = await docxToTiptap(fileContent);
 
     await Document.findByIdAndUpdate(job.documentId, {
       title: job.originalName,
       sourceFileName: job.originalName,
-      content: text,
+      content,
       editedAt: new Date(),
       uploadStatus: "completed",
       uploadError: null,
+      uploadFilePath: null,
     });
 
-    if (process.send) {
-      process.send({ type: "completed", documentId: job.documentId });
-    }
+    await report({ type: "completed", documentId: job.documentId });
 
     cleanupUploadFile(job.filePath);
     process.exit(0);

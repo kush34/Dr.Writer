@@ -72,6 +72,17 @@ const documentSchema = new mongoose.Schema({
         type: String,
         default: null,
     },
+    // Server-side import bookkeeping so a restart can retry a stuck DOCX import. Never sent to clients.
+    uploadFilePath: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    uploadAttempts: {
+        type: Number,
+        default: 0,
+        select: false,
+    },
     sourceFileName: {
         type: String,
         default: null,

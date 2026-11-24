@@ -2,11 +2,12 @@ import { Router } from "express";
 import { z } from "zod";
 import { AppError } from "../utils/appError";
 import firebaseTokenVerify from "../Middlewares/firebaseTokenVerify";
+import { limitByMethod } from "../Middlewares/rateLimits";
 import { getMcpConfig, mcpConfigSchema, updateMcpConfig } from "../service/mcpConfig";
 import { handleControllerError } from "../utils/controllerErrorHandler";
 
 const router = Router();
-router.use(firebaseTokenVerify);
+router.use(firebaseTokenVerify, limitByMethod);
 
 // Only server names are returned; credentials are never sent back.
 router.get("/", async (req, res) => {
