@@ -1,4 +1,4 @@
-type ProposedEdit = { type: string; slide?: number; to?: number; shape?: number; at?: number; from?: number; to?: number; title?: string; body?: string; bullets?: string[]; table?: { header: string[]; rows: string[][] }; text?: string; markdown?: string; blocks?: { type: string; text?: string; items?: string[] }[] };
+type ProposedEdit = { type: string; slide?: number; shape?: number; at?: number; from?: number; to?: number; title?: string; body?: string; bullets?: string[]; table?: { header: string[]; rows: string[][] }; text?: string; markdown?: string; blocks?: { type: string; text?: string; items?: string[] }[] };
 
 export function summarizeEdits(value: unknown): string {
   if (!Array.isArray(value) || value.length === 0) throw new Error("No edits to review.");
