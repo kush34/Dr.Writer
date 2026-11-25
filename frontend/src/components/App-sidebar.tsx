@@ -44,7 +44,7 @@ const items = [
   },
   {
     title: "Plans",
-    url: "#",
+    url: "/#pricing",
     icon: Inbox,
   },
   {

@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend build and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      # tsc is also the backend typecheck. Tests import compiled files from dist/.
+      - run: npm run build
+      - run: node --test tests/*.test.cjs
+
+  frontend:
+    name: Frontend lint, typecheck, tests and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+
+      - name: Lint (no new errors)
+        run: node scripts/check-diagnostics.mjs eslint
+
+      - name: Typecheck (no new errors)
+        run: node scripts/check-diagnostics.mjs tsc
+
+      - run: node --test tests/*.test.mjs
+      - run: npm run build

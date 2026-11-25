@@ -281,7 +281,7 @@ const Landing = () => {
 
         {/* Plans */}
         <section id="pricing" className="bg-white px-5 py-24 sm:px-8 sm:py-32">
-          <div className="text-center"><p className="text-sm text-neutral-500">Pricing</p><h2 className="mt-4 text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-6xl">Start free.<br /><span className="text-neutral-400">Grow at your pace.</span></h2><p className="mx-auto mt-6 max-w-lg text-base leading-7 text-neutral-500 sm:text-lg">Choose the workspace that fits the way you write.</p></div>
+          <div className="text-center"><p className="text-sm text-neutral-500">Pricing</p><h2 className="mt-4 text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-6xl">Start free.<br /><span className="text-neutral-400">Grow at your pace.</span></h2><p className="mx-auto mt-6 max-w-lg text-base leading-7 text-neutral-500 sm:text-lg">Proposed plans and features. Pricing may change; subscriptions and payments are not available yet.</p></div>
           <div className="mx-auto mt-12 grid max-w-5xl gap-3 md:grid-cols-3">
             {[
               { name: "Free", description: "For getting started.", price: "$0", detail: "Free to get started", action: "Start writing", features: ["Document editor and formatting", "AI-assisted writing", "Real-time collaboration", "Document export"] },
@@ -293,7 +293,7 @@ const Landing = () => {
                 <p className="mt-1 text-sm text-neutral-500">{plan.description}</p>
                 <p className="mt-6 text-5xl font-semibold tracking-tight">{plan.price}{plan.price !== "$0" && <span className="text-sm font-normal tracking-normal text-neutral-500"> a month</span>}</p>
                 <p className="mt-2 text-sm text-neutral-500">{plan.detail}</p>
-                <Button asChild className="mt-6 h-12 rounded-full bg-[#111] text-white hover:bg-neutral-800"><a href="/login">{plan.action}</a></Button>
+                <Button disabled className="mt-6 h-12 rounded-full bg-[#111] text-white">Coming soon</Button>
                 <ul className="mt-7 space-y-3 text-sm leading-5 text-neutral-700">{plan.features.map(feature => <li key={feature} className="flex gap-2"><span aria-hidden="true">✓</span><span>{feature}</span></li>)}</ul>
               </article>
             ))}
