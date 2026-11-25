@@ -53,7 +53,12 @@ const documentSchema = new mongoose.Schema({
     user_id: {
         type: mongoose.Schema.Types.ObjectId, ref: 'User'
     },
+    // Collaborator roles. `users` holds editors (the original flat list); the owner is `user_id`.
     users: [String],
+    commenters: [String],
+    viewers: [String],
+    // Free-form labels set by the owner or editors; used to filter the Home list.
+    tags: { type: [String], default: [] },
     relatedImages: {
         type: [relatedImageSchema],
         default: [],
@@ -66,6 +71,17 @@ const documentSchema = new mongoose.Schema({
     uploadError: {
         type: String,
         default: null,
+    },
+    // Server-side import bookkeeping so a restart can retry a stuck DOCX import. Never sent to clients.
+    uploadFilePath: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    uploadAttempts: {
+        type: Number,
+        default: 0,
+        select: false,
     },
     sourceFileName: {
         type: String,

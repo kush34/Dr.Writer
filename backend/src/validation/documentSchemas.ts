@@ -26,6 +26,8 @@ export const presentationPlan = z.array(z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("replace"), slide: z.number().int().nonnegative(), shape: z.number().int().nonnegative(), text: z.string().max(4000) }),
   z.object({ type: z.literal("addText"), slide: z.number().int().nonnegative(), text: z.string().min(1).max(4000) }),
+  z.object({ type: z.literal("deleteSlide"), slide: z.number().int().nonnegative() }),
+  z.object({ type: z.literal("moveSlide"), slide: z.number().int().nonnegative(), to: z.number().int().nonnegative() }),
 ])).min(1).max(60).superRefine((ops, ctx) => {
   ops.forEach((op, index) => {
     if (op.type === "append" && !(op.body?.trim() || op.bullets?.length || op.table || op.layout === "title" || op.layout === "section"))
@@ -46,11 +48,29 @@ export const updateDocumentSchema = z.object({
   file_id: z.string().trim().min(1),
   newContent: z.unknown(),
   title: z.string().trim().min(1).max(255),
+  // The revision the client last loaded or saved. A stale value is rejected with 409.
+  revision: z.number().int().nonnegative(),
 });
+
+export const shareRoleSchema = z.enum(["editor", "commenter", "viewer"]);
 
 export const addUserSchema = z.object({
   file_id: z.string().trim().min(1),
   userToAddMail: z.string().trim().email(),
+  // Defaults to editor so clients that predate roles keep their old behavior.
+  role: shareRoleSchema.default("editor"),
+});
+
+export const removeUserParamsSchema = z.object({
+  documentId: z.string().trim().min(1),
+  userId: z.string().trim().min(1),
+});
+
+export const MAX_TAGS = 10;
+export const setTagsSchema = z.object({
+  // Trimmed, 1-30 characters, at most 10, and unique ignoring case. Stored as typed.
+  tags: z.array(z.string().trim().min(1).max(30)).max(MAX_TAGS)
+    .refine(tags => new Set(tags.map(tag => tag.toLocaleLowerCase())).size === tags.length, "Tags must be unique"),
 });
 
 export const documentActionParamsSchema = z.object({
@@ -98,6 +118,8 @@ export const syncDocumentSchema = z.object({
   file_id: z.string().trim().min(1),
   title: z.string().trim().min(1).max(255),
   newContent: z.unknown(),
+  // The server revision the offline edits were based on.
+  revision: z.number().int().nonnegative(),
 });
 
 export const getChatsParamsSchema = z.object({

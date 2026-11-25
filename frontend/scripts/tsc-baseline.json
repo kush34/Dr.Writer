@@ -1,0 +1,21 @@
+[
+  "node_modules/framer-motion/dist/types.d-DagZKalS.d.ts(33,11): error TS2320: Interface 'MotionStyle' cannot simultaneously extend types 'MakeMotionHelper<Omit<CSSProperties, \"perspective\" | \"rotate\" | \"scale\">>' and 'MakeMotionHelper<TransformProperties>'.",
+  "src/components/EditFileDialog.tsx(15,26): error TS7031: Binding element 'fileInfo' implicitly has an 'any' type.",
+  "src/components/EditFileDialog.tsx(15,35): error TS7031: Binding element 'setTitle' implicitly has an 'any' type.",
+  "src/components/Login.tsx(91,21): error TS2322: Type '{ size: string; }' is not assignable to type 'IntrinsicAttributes'.",
+  "src/firebaseAuth/firebaseConfig.ts(113,7): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.",
+  "src/service/IndexDb.ts(11,18): error TS18047: 'event.target' is possibly 'null'.",
+  "src/service/IndexDb.ts(11,31): error TS2339: Property 'result' does not exist on type 'EventTarget'.",
+  "src/service/IndexDb.ts(18,15): error TS18047: 'event.target' is possibly 'null'.",
+  "src/service/IndexDb.ts(18,28): error TS2339: Property 'result' does not exist on type 'EventTarget'.",
+  "src/service/IndexDb.ts(22,14): error TS18047: 'event.target' is possibly 'null'.",
+  "src/service/IndexDb.ts(22,27): error TS2339: Property 'error' does not exist on type 'EventTarget'.",
+  "src/service/IndexDb.ts(28,35): error TS7006: Parameter 'doc' implicitly has an 'any' type.",
+  "src/service/IndexDb.ts(31,23): error TS18046: 'db' is of type 'unknown'.",
+  "src/service/IndexDb.ts(42,35): error TS7006: Parameter 'id' implicitly has an 'any' type.",
+  "src/service/IndexDb.ts(44,23): error TS18046: 'db' is of type 'unknown'.",
+  "src/service/IndexDb.ts(54,45): error TS7006: Parameter 'doc' implicitly has an 'any' type.",
+  "src/service/IndexDb.ts(56,23): error TS18046: 'db' is of type 'unknown'.",
+  "src/service/IndexDb.ts(61,38): error TS7006: Parameter 'id' implicitly has an 'any' type.",
+  "src/service/IndexDb.ts(63,23): error TS18046: 'db' is of type 'unknown'."
+]

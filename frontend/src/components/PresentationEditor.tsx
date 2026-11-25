@@ -18,8 +18,10 @@ import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import "./PresentationEditor.css";
 
-export default function PresentationEditor({ id, title, pptx, revision }: {
+export default function PresentationEditor({ id, title, pptx, revision, readOnly = false }: {
   id: string; title: string; pptx?: string; revision: number;
+  /** Viewers and commenters can look at and download the deck, but not change or save it. */
+  readOnly?: boolean;
 }) {
   const [bytes] = useState(() => Uint8Array.from(atob(pptx ?? blank.split(",")[1]), c => c.charCodeAt(0)));
   const [localTitle, setLocalTitle] = useState(title);
@@ -40,7 +42,7 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
   const { theme } = useTheme();
 
   useEffect(() => {
-    if (!editor || !presentation) return;
+    if (!editor || !presentation || readOnly) return;
     const host = createBrowserAutomationHost(editor);
     const unsubscribe = host.subscribe(() => setEditRevision(editor.session?.store.revision ?? 0));
     let active = true;
@@ -57,9 +59,10 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
       return true;
     };
     return () => { active = false; presentation.current = null; unsubscribe(); host.dispose(); };
-  }, [editor, id, presentation]);
+  }, [editor, id, presentation, readOnly]);
 
   const save = useCallback(async (download: boolean) => {
+    if (readOnly && !download) return;
     if (!download && inFlight.current) return;
     const snapshot = editor?.session?.store.revision ?? 0;
     const rawTitle = localTitle;
@@ -95,10 +98,10 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
     } catch (err) {
       toast.error(isAxiosError(err) ? err.response?.data?.message || "Save failed. Download a copy before leaving." : String(err));
     } finally { inFlight.current = false; setSaving(false); }
-  }, [editor, id, localTitle, query]);
+  }, [editor, id, localTitle, query, readOnly]);
 
   useEffect(() => {
-    if (!autosave || !dirty || saving || attempted.current === editRevision) return;
+    if (readOnly || !autosave || !dirty || saving || attempted.current === editRevision) return;
     const timer = window.setTimeout(() => void save(false), 1000);
     return () => clearTimeout(timer);
   }, [autosave, dirty, saving, editRevision, save]);
@@ -116,17 +119,19 @@ export default function PresentationEditor({ id, title, pptx, revision }: {
       <button disabled={saving} onClick={() => blocker.proceed()}>Discard and leave</button>
     </div>}
     <header className="flex items-center gap-3 pb-2">
-      <input aria-label="Presentation title" maxLength={255} value={localTitle} onChange={event => setLocalTitle(event.target.value)} className="mr-auto min-w-0 flex-1 rounded bg-transparent px-2 text-lg font-bold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" />
-      <label><input type="checkbox" checked={autosave} onChange={event => { attempted.current = undefined; setAutosave(event.target.checked); }} /> Autosave</label>
-      <Button aria-label="Save presentation" title={saving ? "Saving…" : "Save presentation"} disabled={!editor || saving} onClick={() => save(false)}>
-        <SaveAll />
-      </Button>
+      <input aria-label="Presentation title" maxLength={255} value={localTitle} readOnly={readOnly} onChange={event => setLocalTitle(event.target.value)} className="mr-auto min-w-0 flex-1 rounded bg-transparent px-2 text-lg font-bold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" />
+      {readOnly ? <span role="status" className="shrink-0 rounded border px-2 py-0.5 text-xs text-muted-foreground">View only</span> : <>
+        <label><input type="checkbox" checked={autosave} onChange={event => { attempted.current = undefined; setAutosave(event.target.checked); }} /> Autosave</label>
+        <Button aria-label="Save presentation" title={saving ? "Saving…" : "Save presentation"} disabled={!editor || saving} onClick={() => save(false)}>
+          <SaveAll />
+        </Button>
+      </>}
       <Button aria-label="Download presentation" title="Download presentation" disabled={!editor} onClick={() => save(true)}>
         <Download />
       </Button>
       <button type="button" aria-label="Back to documents" title="Back to documents" onClick={() => navigate("/home")} className="ml-3 flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
         <ArrowLeft size={18} />
       </button></header>
-    <PptxEditor className="min-h-0 flex-1" document={bytes} mode="edit" colorMode={theme} notesPane={{ defaultOpen: false, className: "presentation-notes" }} onReady={setEditor} />
+    <PptxEditor className="min-h-0 flex-1" document={bytes} mode={readOnly ? "view" : "edit"} colorMode={theme} notesPane={{ defaultOpen: false, className: "presentation-notes" }} onReady={setEditor} />
   </section>;
 }

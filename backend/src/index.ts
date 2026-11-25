@@ -7,18 +7,20 @@ import http from 'http';
 import userRouter from './Routes/userRouter';
 import documentRouter from './Routes/documentRouter';
 import mcpRouter from './Routes/mcpRouter';
-import rateLimit from 'express-rate-limit'
+import { failedRequestLimiter, parseTrustProxy } from './Middlewares/rateLimits';
 import User from "./Models/userModel";
+import { recoverStuckUploads } from './service/documentUploadQueue';
+import { registerSocket } from "./socket";
 //Connection to the database
-connectDB();
+connectDB().then(() => recoverStuckUploads()).then(
+  ({ requeued, failed }) => { if (requeued || failed) console.log(`Recovered DOCX imports: ${requeued} requeued, ${failed} failed`); },
+  (error) => console.error('Could not recover stuck DOCX imports:', error)
+);
 const app = express();
 
 
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100, 
-  message: 'Too many requests, please try again later.',
-});
+// Behind a reverse proxy, set TRUST_PROXY (for example 1) so req.ip is the real client address.
+app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
 
 const server  = http.createServer(app);
 const  io = new Server(server,{
@@ -35,7 +37,7 @@ var corsOptions = {
 };
 app.use(cors(corsOptions));
 app.use(express.urlencoded({extended:true}));
-app.use(globalLimiter);
+app.use(failedRequestLimiter);
 app.use("/api/document/:documentId/presentation", express.json({ limit: "9mb" }));
 app.use(express.json());
 app.use('/api',userRouter);
@@ -45,33 +47,7 @@ app.use((req, res, next) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-//Socket events 
-io.on("connection",(socket)=>{
-  console.log('user connected');
-
-  socket.on('enter',async (email,code)=>{
-    console.log(`User entered room`,email,code);
-		socket.join(code);
-		socket.to(code).emit('enter',email,code);
-	});
-  
-  socket.on('reconnect_attempt', () => {
-    console.log('Reconnecting...');
-  });
-
-  
-  socket.on('text-changes',async(delta,code)=>{
-    socket.to(code).emit('text-changes',delta);
-  });
-
-  socket.on('test',async(code)=>{
-    socket.to(code).emit('test');
-  });
-
-  socket.on("disconnect", () => {
-		console.log(`user disconnected`)
-	});
-})
+registerSocket(io);
 
 app.listen(process.env.PORT || 5000,()=>{
     console.log(`server running on port ${process.env.PORT}`)

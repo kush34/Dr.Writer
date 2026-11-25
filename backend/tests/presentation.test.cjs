@@ -1,5 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const { mockBalance } = require("./meter-helper.cjs");
 const Document = require("../dist/Models/documentModel").default;
 const router = require("../dist/service/openrouter");
 const auth = require("../dist/service/openrouterAuth");
@@ -13,7 +14,7 @@ test("presentation actions and saves enforce document access, kind, and revision
   assert.equal(createDocumentSchema.parse({ title: "Legacy" }).kind, "document");
   assert.ok(savePresentationSchema.safeParse({ pptx, revision: 0 }).success);
   assert.equal(savePresentationSchema.parse({ pptx, revision: 0, title: "Renamed deck" }).title, "Renamed deck");
-  const doc = { kind: "presentation", revision: 0, user_id: "owner", users: ["member"] };
+  const doc = { kind: "presentation", revision: 0, user_id: "owner", users: ["member"], viewers: ["viewer"] };
   t.mock.method(Document, "create", async properties => properties);
   assert.equal((await createDocument("owner", "Slides", "presentation")).kind, "presentation");
   t.mock.method(Document, "findById", async () => doc);
@@ -26,6 +27,7 @@ test("presentation actions and saves enforce document access, kind, and revision
     return { modifiedCount: 1 };
   });
   t.mock.method(auth, "getOpenRouterKey", async () => undefined);
+  mockBalance(t, 1_000_000);
   const plan = [{ type: "append", title: "Overview", body: "Project status" }];
   const model = t.mock.method(router, "openRouterComplete", async (prompt, name) => {
     assert.ok(prompt.includes("First slide"));
@@ -33,8 +35,11 @@ test("presentation actions and saves enforce document access, kind, and revision
     return JSON.stringify({ operations: plan });
   });
   const edit = user => performDocumentAction(user, "deck", "Add overview", undefined, "selected-model", [["First slide"]]);
-  await assert.rejects(edit("member"), { statusCode: 403 });
+  // Viewers and outsiders cannot run AI edits; editors (the `users` list) can since roles exist.
+  await assert.rejects(edit("viewer"), { statusCode: 403 });
+  await assert.rejects(edit("outsider"), { statusCode: 403 });
   assert.equal(model.mock.callCount(), 0);
+  assert.deepEqual((await edit("member")).operations, plan);
   assert.deepEqual((await edit("owner")).operations, plan);
   model.mock.mockImplementation(async () => '{"operations":[{"type":"unknown"}]}');
   await assert.rejects(edit("owner"), { statusCode: 502 });
@@ -64,9 +69,46 @@ test("slide edits accept layouts, bullets and tables and the prompt describes th
 
   t.mock.method(Document, "findById", async () => ({ kind: "presentation", revision: 0, user_id: "owner", users: [] }));
   t.mock.method(auth, "getOpenRouterKey", async () => undefined);
+  mockBalance(t, 1_000_000);
   let seen = "";
   t.mock.method(router, "openRouterComplete", async prompt => { seen = prompt; return JSON.stringify({ operations: plan }); });
   const result = await performDocumentAction("owner", "deck", "Add a plan", undefined, "m", [["First slide"]], () => {}, () => {}, deck);
   assert.deepEqual(result.operations, plan);
   assert.ok(seen.includes("960x540") && seen.includes("Title and Content (obj)") && seen.includes('"bullets"'));
+});
+
+test("slide delete and move edits are planned against the original numbering", async t => {
+  const { presentationPlan } = require("../dist/validation/documentSchemas");
+  const { planSlideOrder } = require("../dist/utils/lintEdits");
+  const del = slide => ({ type: "deleteSlide", slide });
+  const move = (slide, to) => ({ type: "moveSlide", slide, to });
+  assert.ok(presentationPlan.safeParse([del(1), move(3, 0)]).success);
+  assert.ok(!presentationPlan.safeParse([{ type: "moveSlide", slide: 1 }]).success);
+  assert.ok(!presentationPlan.safeParse([{ type: "deleteSlide", slide: -1 }]).success);
+
+  assert.deepEqual(planSlideOrder([del(1), del(3), move(4, 0)], 5).order, [4, 0, 2]);
+  assert.deepEqual(planSlideOrder([move(0, 2)], 3).order, [1, 2, 0]);
+  assert.deepEqual(planSlideOrder([move(0, 1), move(2, 0)], 3).order, [2, 1, 0]);
+  const bad = (ops, count) => planSlideOrder(ops, count).problems.join(" | ");
+  assert.match(bad([del(5)], 3), /does not exist/);
+  assert.match(bad([del(1), del(1)], 3), /already deleted/);
+  assert.match(bad([del(1), move(1, 0)], 3), /deleted and also edited or moved/);
+  assert.match(bad([del(1), { type: "addText", slide: 1, text: "x" }], 3), /deleted and also edited or moved/);
+  assert.match(bad([move(0, 3)], 3), /last position is 2/);
+  assert.match(bad([del(0), del(1)], 2), /every slide/);
+  assert.equal(bad([del(0), del(1), { type: "append", title: "New", bullets: ["x"] }], 2), "");
+
+  t.mock.method(Document, "findById", async () => ({ kind: "presentation", revision: 0, user_id: "owner", users: [] }));
+  t.mock.method(auth, "getOpenRouterKey", async () => undefined);
+  mockBalance(t, 1_000_000);
+  const prompts = [];
+  const replies = [[del(0), del(1), del(2)], [del(1), move(2, 0)]];
+  t.mock.method(router, "openRouterComplete", async prompt => { prompts.push(prompt); return JSON.stringify({ operations: replies.shift() }); });
+  const previews = [];
+  const result = await performDocumentAction("owner", "deck", "Drop slide 2 and lead with the last one", undefined, "m", [["One"], ["Two"], ["Three"]], () => {}, text => previews.push(text));
+  assert.deepEqual(result.operations, [del(1), move(2, 0)]);
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[0], /deleteSlide/);
+  assert.match(prompts[1], /delete every slide/);
+  assert.match(previews.at(-1), /Delete slide 2\n\nMove slide 3 to position 1/);
 });

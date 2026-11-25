@@ -39,6 +39,43 @@ export function lintSlides(ops: SlideLike[]): string[] {
   return problems;
 }
 
+type StructureOp = { type: string; slide?: number; to?: number };
+
+/**
+ * Slide numbers in deleteSlide/moveSlide/replace/addText always mean the ORIGINAL deck. Deletes apply first, then moves in
+ * listed order, where `to` is the position counted after the earlier changes. Returns the final order of the original
+ * slides (null when a problem makes it meaningless) so the preview can show it.
+ */
+export function planSlideOrder(ops: StructureOp[], slideCount: number): { order: number[] | null; problems: string[] } {
+  const problems: string[] = [];
+  const deleted = new Set<number>();
+  const touched = new Set<number>();
+  ops.forEach((op, index) => {
+    if (op.type === "append" || op.slide === undefined) return;
+    const at = `Operation ${index}`;
+    if (op.slide >= slideCount) problems.push(`${at}: slide ${op.slide} does not exist (valid 0..${slideCount - 1})`);
+    if (op.type === "deleteSlide") {
+      if (deleted.has(op.slide)) problems.push(`${at}: slide ${op.slide} is already deleted`);
+      deleted.add(op.slide);
+    } else touched.add(op.slide);
+  });
+  ops.forEach((op, index) => {
+    if (op.type === "deleteSlide" && op.slide !== undefined && touched.has(op.slide)) problems.push(`Operation ${index}: slide ${op.slide} is deleted and also edited or moved`);
+  });
+  const order = Array.from({ length: slideCount }, (_, slide) => slide).filter(slide => !deleted.has(slide));
+  const appended = ops.some(op => op.type === "append");
+  if (!order.length && !appended && slideCount > 0 && deleted.size) problems.push("This would delete every slide; keep at least one or append new slides");
+  ops.forEach((op, index) => {
+    if (op.type !== "moveSlide" || op.slide === undefined || op.to === undefined) return;
+    const from = order.indexOf(op.slide);
+    if (from < 0) return;
+    order.splice(from, 1);
+    if (op.to > order.length) { problems.push(`Operation ${index}: "to" is ${op.to} but the last position is ${order.length}`); order.splice(from, 0, op.slide); return; }
+    order.splice(op.to, 0, op.slide);
+  });
+  return { order: problems.length ? null : order, problems };
+}
+
 type DocOp = { type: string; markdown?: string; text?: string; blocks?: unknown[] };
 
 export function lintDocumentOps(ops: DocOp[]): string[] {

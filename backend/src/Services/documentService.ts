@@ -1,6 +1,6 @@
 import { ZodError, type z } from "zod";
 import { getOpenRouterKey } from "../service/openrouterAuth";
-import { assertClean, cleanSlides, lintDocumentOps, lintSlides } from "../utils/lintEdits";
+import { assertClean, cleanSlides, lintDocumentOps, lintSlides, planSlideOrder } from "../utils/lintEdits";
 import { presentationPlan, presentationDeck } from "../validation/documentSchemas";
 import { Response } from "express";
 import mongoose from "mongoose";
@@ -15,6 +15,7 @@ import { applyEdits } from "../utils/applyEdits";
 import { documentToMarkdownBlocks } from "../utils/markdown";
 import { validateDocumentOperations } from "../utils/llmActions";
 import { AppError, isAppError } from "../utils/appError";
+import { documentAccessChanged } from "../utils/documentAccessEvents";
 import { openRouterStream, openRouterComplete, openRouterWithTools } from "../service/openrouter";
 import { getMcpConfig } from "../service/mcpConfig";
 import { connectMcpServers } from "../service/mcpClient";
@@ -59,26 +60,30 @@ const findDocumentOrThrow = async (documentId: string) => {
 const isDocumentOwner = (userId: string, ownerId: unknown) =>
   ownerId?.toString() === userId.toString();
 
-const hasDocumentAccess = (
-  userId: string,
-  document: { user_id?: unknown; users: string[] }
-) =>
-  isDocumentOwner(userId, document.user_id) ||
-  document.users.includes(userId.toString());
+export type DocumentRole = "owner" | "editor" | "commenter" | "viewer";
+type RoleSource = { user_id?: unknown; users?: string[]; commenters?: string[]; viewers?: string[] };
 
-export const getTestDocument = async () => {
-  const testFileId = process.env.testFile;
+/** The user's strongest role on a document, or null when they have no access. Missing arrays (older documents) count as empty. */
+export const getDocumentRole = (userId: string, document: RoleSource): DocumentRole | null => {
+  const id = userId.toString();
+  if (isDocumentOwner(id, document.user_id)) return "owner";
+  if (document.users?.includes(id)) return "editor";
+  if (document.commenters?.includes(id)) return "commenter";
+  if (document.viewers?.includes(id)) return "viewer";
+  return null;
+};
 
-  if (!testFileId) {
-    throw new AppError(500, "Test document is not configured");
-  }
+export const canEditRole = (role: DocumentRole | null) => role === "owner" || role === "editor";
 
-  const document = await Document.findById(testFileId);
-  if (!document) {
-    throw new AppError(404, "Document not found!");
-  }
+const hasDocumentAccess = (userId: string, document: RoleSource) => getDocumentRole(userId, document) !== null;
 
-  return document;
+const anyRoleFilter = (userId: string) => ({
+  $or: [{ user_id: userId }, { users: userId }, { commenters: userId }, { viewers: userId }],
+});
+
+/** Throws unless the user may change the document. Commenters ship read-only until comments exist. */
+const assertCanEdit = (role: DocumentRole | null) => {
+  if (!canEditRole(role)) throw new AppError(403, "You have view-only access to this document");
 };
 
 export const createDocument = async (userId: string, title: string, kind: "document" | "presentation" = "document", pptx?: string) => {
@@ -89,9 +94,13 @@ export const createDocument = async (userId: string, title: string, kind: "docum
 };
 
 export const getDocumentList = async (userId: string) => {
-  const documents = await Document.find({ user_id: userId }).select(
-    "kind title content createdAt editedAt uploadStatus uploadError sourceFileName"
+  const documents = await Document.find(anyRoleFilter(userId)).select(
+    "kind title content createdAt editedAt uploadStatus uploadError sourceFileName user_id users commenters viewers tags"
   ).lean();
+  // Documents shared with this user carry the owner's name, so Home can say who shared them.
+  const sharedOwnerIds = [...new Set(documents.filter(document => !isDocumentOwner(userId, document.user_id)).map(document => String(document.user_id)))];
+  const owners = sharedOwnerIds.length ? await User.find({ _id: { $in: sharedOwnerIds } }).select("name email").lean() : [];
+  const ownerLabel = new Map(owners.map(owner => [String(owner._id), owner.name || owner.email || "Someone"]));
   const previewText = (content: unknown): string => {
     if (typeof content === "string") return content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
     const words: string[] = [];
@@ -103,12 +112,16 @@ export const getDocumentList = async (userId: string) => {
     visit(content);
     return words.join(" ").slice(0, 300);
   };
-  return documents.map(({ content, ...document }) => ({ ...document, preview: previewText(content) }));
+  return documents.map(({ content, user_id, users, commenters, viewers, ...document }) => {
+    const owned = isDocumentOwner(userId, user_id);
+    const role = getDocumentRole(userId, { user_id, users, commenters, viewers });
+    return { ...document, owned, role, ...(owned ? {} : { sharedBy: ownerLabel.get(String(user_id)) ?? "Someone" }), preview: previewText(content) };
+  });
 };
 
 export const searchDocuments = async (userId: string, query: string) => {
   const results: { _id: string; title: string; excerpt: string }[] = [];
-  const cursor = Document.find({ $or: [{ user_id: userId }, { users: userId }] }).select("title content").lean().cursor();
+  const cursor = Document.find(anyRoleFilter(userId)).select("title content").lean().cursor();
   for await (const document of cursor) {
     const excerpt = searchExcerpt(documentText(document.content), query);
     if (excerpt !== null || document.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())) {
@@ -129,30 +142,36 @@ export const getDocumentData = async (userId: string, fileId: string) => {
   return document;
 };
 
-export const updateDocument = async (
-  userId: string,
-  fileId: string,
-  title: string,
-  newContent: unknown
-) => {
+/**
+ * Saves a text document only if `revision` is still the stored one, so a stale client can never
+ * overwrite newer edits. Returns the new revision; a mismatch is a 409 and nothing is written.
+ */
+const saveTextDocument = async (userId: string, fileId: string, title: string, content: unknown, revision: number) => {
   const document = await getDocumentData(userId, fileId);
+  assertCanEdit(getDocumentRole(userId, document));
   if (document.kind === "presentation") throw new AppError(400, "Use presentation save");
-
-  const updatedDocument = await Document.findByIdAndUpdate(
-    fileId,
-    { content: newContent, title, editedAt: new Date() },
-    { new: true }
+  const saved = await Document.updateOne(
+    {
+      $and: [
+        { _id: fileId },
+        // Documents created before `revision` existed have no such field, which counts as 0.
+        revision === 0 ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] } : { revision },
+        // Only the owner and editors match here, so a role downgrade between the check above and this write still loses.
+        { $or: [{ user_id: userId }, { users: userId }] },
+      ],
+    },
+    { $set: { content, title, editedAt: new Date() }, $inc: { revision: 1 } }
   );
-
-  if (!updatedDocument) {
-    throw new AppError(404, "Document not found");
-  }
-
-  return updatedDocument;
+  if (!saved.modifiedCount) throw new AppError(409, "This document changed since you opened it. Your edits were not saved over the newer version.");
+  return revision + 1;
 };
+
+export const updateDocument = (userId: string, fileId: string, title: string, newContent: unknown, revision: number) =>
+  saveTextDocument(userId, fileId, title, newContent, revision);
 
 export const savePresentation = async (userId: string, id: string, revision: number, pptx: string, title?: string) => {
   const document = await getDocumentData(userId, id);
+  assertCanEdit(getDocumentRole(userId, document));
   if (document.kind !== "presentation") throw new AppError(400, "Expected a presentation");
   const saved = await Document.updateOne({ _id: id, revision, $or: [{ user_id: userId }, { users: userId }] },
     { $set: { pptx, ...(title ? { title } : {}), editedAt: new Date() }, $inc: { revision: 1 } });
@@ -160,10 +179,15 @@ export const savePresentation = async (userId: string, id: string, revision: num
   return revision + 1;
 };
 
+const ROLE_FIELDS = { editor: "users", commenter: "commenters", viewer: "viewers" } as const;
+type ShareRole = keyof typeof ROLE_FIELDS;
+
+/** Adds a collaborator, or moves an existing one to a different role. Owner only. */
 export const addUserToDocument = async (
   ownerUserId: string,
   fileId: string,
-  userToAddMail: string
+  userToAddMail: string,
+  role: ShareRole = "editor"
 ) => {
   const userToAdd = await User.findOne({ email: userToAddMail });
   if (!userToAdd) {
@@ -174,10 +198,75 @@ export const addUserToDocument = async (
   if (!isDocumentOwner(ownerUserId, document.user_id)) {
     throw new AppError(403, "You are not authorized to update this document");
   }
+  const targetId = userToAdd._id.toString();
+  if (isDocumentOwner(targetId, document.user_id)) throw new AppError(400, "The owner already has full access");
 
-  await Document.findByIdAndUpdate(fileId, {
-    $addToSet: { users: userToAdd._id.toString() },
+  const otherFields = Object.entries(ROLE_FIELDS).filter(([name]) => name !== role).map(([, field]) => field);
+  await Document.updateOne({ _id: fileId }, {
+    $addToSet: { [ROLE_FIELDS[role]]: targetId },
+    $pull: Object.fromEntries(otherFields.map(field => [field, targetId])),
   });
+  documentAccessChanged(fileId);
+};
+
+/** Removes a collaborator from every role. The owner can remove anyone; collaborators can remove only themselves (leave). */
+export const removeUserFromDocument = async (requesterId: string, fileId: string, targetUserId: string) => {
+  const document = await findDocumentOrThrow(fileId);
+  const requesterIsOwner = isDocumentOwner(requesterId, document.user_id);
+  if (!requesterIsOwner && requesterId.toString() !== targetUserId) {
+    throw new AppError(403, "You are not authorized to update this document");
+  }
+  if (isDocumentOwner(targetUserId, document.user_id)) throw new AppError(400, "The owner cannot be removed");
+  await Document.updateOne({ _id: fileId }, { $pull: { users: targetUserId, commenters: targetUserId, viewers: targetUserId } });
+  documentAccessChanged(fileId);
+};
+
+/** Replaces the document's tags. Owner or editor. Tags are labels, not content, so this does not bump `revision` and never conflicts with a save. */
+export const setDocumentTags = async (userId: string, fileId: string, tags: string[]) => {
+  const document = await getDocumentData(userId, fileId);
+  assertCanEdit(getDocumentRole(userId, document));
+  await Document.updateOne({ _id: fileId }, { $set: { tags } });
+  return tags;
+};
+
+/**
+ * Permanently deletes a document, its chat history and its uploaded images. Owner only.
+ * The document goes first so access ends at once; image cleanup is best effort and never fails the delete.
+ */
+export const deleteDocument = async (userId: string, fileId: string) => {
+  const document = await findDocumentOrThrow(fileId);
+  if (!isDocumentOwner(userId, document.user_id)) throw new AppError(403, "Only the owner can delete this document");
+  await Document.deleteOne({ _id: fileId });
+  await Chat.deleteMany({ documentId: fileId });
+  documentAccessChanged(fileId);
+  if (document.relatedImages?.length && process.env.CLOUDINARY_CLOUD_NAME) {
+    try {
+      await cloudinary.api.delete_resources_by_prefix(`documents/${fileId}/`);
+    } catch (error) {
+      // Logged without the error body, which can echo request details.
+      console.error(`Could not remove uploaded images for deleted document ${fileId}:`, (error as Error)?.message);
+    }
+  }
+};
+
+/** Owner, then collaborators with their role. Owner only, since it exposes emails. */
+export const listDocumentMembers = async (requesterId: string, fileId: string) => {
+  const document = await findDocumentOrThrow(fileId);
+  if (!isDocumentOwner(requesterId, document.user_id)) throw new AppError(403, "You are not authorized to view this document's members");
+  const roles: Record<string, DocumentRole> = {};
+  for (const id of document.viewers ?? []) roles[id] = "viewer";
+  for (const id of document.commenters ?? []) roles[id] = "commenter";
+  for (const id of document.users ?? []) roles[id] = "editor";
+  const ownerId = String(document.user_id);
+  const ids = [ownerId, ...Object.keys(roles)];
+  const people = await User.find({ _id: { $in: ids } }).select("name email").lean();
+  const byId = new Map(people.map(person => [String(person._id), person]));
+  return ids.map(id => ({
+    userId: id,
+    email: byId.get(id)?.email ?? "Unknown user",
+    name: byId.get(id)?.name ?? null,
+    role: id === ownerId ? "owner" as const : roles[id],
+  }));
 };
 
 /** Earlier edit requests on this document, so "make it shorter" or "now the next section" keep their meaning. Optional context: any failure just means none. */
@@ -187,6 +276,33 @@ const recentRequests = async (documentId: string) => {
     const chats = await Chat.find({ documentId }).sort({ createdAt: -1, _id: -1 }).limit(4).lean();
     return chats.reverse().map(chat => `- User: ${String(chat.prompt).slice(0, 300)}\n  Result: ${String(chat.response).slice(0, 200)}`).join("\n");
   } catch { return ""; }
+};
+
+const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+
+/**
+ * Runs one model call for a user without their own OpenRouter key, charging their token balance.
+ * The worst case (prompt plus the maximum reply) is reserved first, so a user without enough balance
+ * is refused with 402 before anything reaches the server's key. Afterwards the reservation is settled
+ * to the estimated real usage (length/4, as in streamUserPrompt), or refunded if the call failed.
+ */
+const meteredCall = async (userId: string, prompt: string, system: string, call: () => Promise<string>) => {
+  const promptTokens = estimateTokens(prompt) + estimateTokens(system);
+  const hold = promptTokens + MAX_TOKENS_PER_REQUEST;
+  const reservedUser = await User.findOneAndUpdate(
+    { _id: userId, token_balance: { $gte: hold } },
+    { $inc: { token_balance: -hold } },
+    { new: true }
+  );
+  if (!reservedUser) throw new AppError(402, "Insufficient token balance. Add your own OpenRouter key in settings or try again later.");
+  let used = 0;
+  try {
+    const raw = await call();
+    used = promptTokens + estimateTokens(raw);
+    return raw;
+  } finally {
+    await User.updateOne({ _id: userId }, { $inc: { token_balance: hold - used } });
+  }
 };
 
 export const performDocumentAction = async (
@@ -202,7 +318,8 @@ export const performDocumentAction = async (
 ) => {
   const document = await findDocumentOrThrow(documentId);
 
-  if (!isDocumentOwner(userId, document.user_id)) {
+  // Editors may use AI edits too; the requester, not the owner, is the one metered (see getOpenRouterKey).
+  if (!canEditRole(getDocumentRole(userId, document))) {
     throw new AppError(403, "Document not found");
   }
 
@@ -214,7 +331,10 @@ export const performDocumentAction = async (
     let feedback = "";
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt) onProgress("Retrying the model response");
-      const raw = await openRouterComplete(prompt + feedback, model, apiKey, { system: EDIT_SYSTEM_PROMPT, json: true, temperature: 0.3 });
+      const fullPrompt = prompt + feedback;
+      const call = () => openRouterComplete(fullPrompt, model, apiKey, { system: EDIT_SYSTEM_PROMPT, json: true, temperature: 0.3 });
+      // Users with their own key pay OpenRouter directly; everyone else is metered on every attempt.
+      const raw = apiKey ? await call() : await meteredCall(userId, fullPrompt, EDIT_SYSTEM_PROMPT, call);
       onProgress("Checking the response");
       try {
         if (!raw.trim()) throw new Error("The response was empty; provide the requested JSON object.");
@@ -254,16 +374,19 @@ Allowed operations:
 - {"type":"append","layout":"title|content|section","title":"...","bullets":["..."],"table":{"header":["..."],"rows":[["..."]]}} adds a new slide at the end. layout defaults to "content". Use "title" for an opening slide (title plus an optional one-line "body" subtitle, no bullets) and "section" for a divider. For "content" slides give 3 to 5 "bullets", each a short phrase of at most 12 words with no bullet characters. Use "table" instead of bullets only for comparisons or figures, at most 6 rows. Titles stay under 8 words.
 - {"type":"addText","slide":N,"text":"..."} adds a text box to an existing slide N.
 - {"type":"replace","slide":N,"shape":M,"text":"..."} rewrites existing shape M on existing slide N.
-The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. addText and replace may only use those indexes; use append for new slides. Preserve unrelated content. Outline lists the text of each shape in zero-based order; null means non-text. Never target a null shape.
+- {"type":"deleteSlide","slide":N} deletes existing slide N. Use it only when the user asks to remove or condense slides, and never on a slide you also edit.
+- {"type":"moveSlide","slide":N,"to":P} moves existing slide N so it ends at zero-based position P, counted after all deletions and after earlier moves in your list. Use it only when the user asks to reorder.
+The presentation has ${outline.length} existing slide(s), valid indexes 0..${outline.length - 1}. Every slide number N always refers to the ORIGINAL numbering, even after other operations. addText, replace, deleteSlide and moveSlide may only use those indexes; use append for new slides. Preserve unrelated content. Outline lists the text of each shape in zero-based order; null means non-text. Never target a null shape.
 ${deck ? `Slide size is ${deck.width}x${deck.height} points. Available layouts: ${deck.layouts.map(layout => `${layout.name} (${layout.type})`).join(", ")}. Slides and their shapes: ${JSON.stringify(deck.slides)}\n` : ""}Example: {"operations":[{"type":"append","layout":"title","title":"Q3 Plan","body":"Priorities and budget"},{"type":"append","title":"Priorities","bullets":["Ship the editor","Cut load time in half","Hire two engineers"]}]}
 Outline: ${JSON.stringify(outline)}
 ${background}Request: ${command}${plan}`, value => {
         const ops = cleanSlides(presentationPlan.parse(value?.operations));
         assertClean(lintSlides(ops));
-        if (ops.some(op => op.type !== "append" && (op.slide >= outline.length || (op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))))) throw new Error("Slide or shape index is invalid");
+        assertClean(planSlideOrder(ops, outline.length).problems);
+        if (ops.some(op => op.type === "replace" && (op.shape >= outline[op.slide].length || outline[op.slide][op.shape] === null))) throw new Error("Slide or shape index is invalid");
         return ops;
       });
-    onPreview(`Proposed slide edits\n${operations.map(op => op.type === "append" ? `Add slide: ${op.title}\n${[op.body, ...(op.bullets ?? []).map(point => `  • ${point}`), op.table ? [op.table.header, ...op.table.rows].map(row => row.join(" | ")).join("\n") : ""].filter(Boolean).join("\n")}` : `Slide ${op.slide + 1}: ${op.text}`).join("\n\n")}`);
+    onPreview(`Proposed slide edits\n${operations.map(op => op.type === "append" ? `Add slide: ${op.title}\n${[op.body, ...(op.bullets ?? []).map(point => `  • ${point}`), op.table ? [op.table.header, ...op.table.rows].map(row => row.join(" | ")).join("\n") : ""].filter(Boolean).join("\n")}` : op.type === "deleteSlide" ? `Delete slide ${op.slide + 1}` : op.type === "moveSlide" ? `Move slide ${op.slide + 1} to position ${op.to + 1}` : `Slide ${op.slide + 1}: ${op.text}`).join("\n\n")}`);
     return { operations };
   }
 
@@ -428,27 +551,8 @@ export const streamUserPrompt = async (
   }
 };
 
-export const syncDocument = async (
-  userId: string,
-  fileId: string,
-  title: string,
-  newContent: unknown
-) => {
-  const document = await findDocumentOrThrow(fileId);
-
-  if (!hasDocumentAccess(userId, document)) {
-    throw new AppError(403, "You are not authorized to access this document");
-  }
-
-  if (document.kind === "presentation") throw new AppError(400, "Use presentation save");
-  if (title !== document.title || newContent !== document.content) {
-    await Document.findByIdAndUpdate(
-      fileId,
-      { title, content: newContent, editedAt: new Date() },
-      { new: true }
-    );
-  }
-};
+export const syncDocument = (userId: string, fileId: string, title: string, newContent: unknown, revision: number) =>
+  saveTextDocument(userId, fileId, title, newContent, revision);
 
 export const getDocumentChats = async (userId: string, documentId: string) => {
   await getDocumentData(userId, documentId);
@@ -457,7 +561,7 @@ export const getDocumentChats = async (userId: string, documentId: string) => {
 
 export const saveActionHistory = async (userId: string, documentId: string, prompt: string, response: string) => {
   const document = await findDocumentOrThrow(documentId);
-  if (!isDocumentOwner(userId, document.user_id)) throw new AppError(403, "Document not found");
+  if (!canEditRole(getDocumentRole(userId, document))) throw new AppError(403, "Document not found");
   return Chat.create({ documentId, prompt, response });
 };
 
@@ -480,7 +584,7 @@ export const createDocumentImageSignature = async (
   documentId: string,
   originalName: string
 ) => {
-  await getDocumentData(userId, documentId);
+  assertCanEdit(getDocumentRole(userId, await getDocumentData(userId, documentId)));
   assertCloudinaryConfigured();
 
   const timestamp = Math.floor(Date.now() / 1000);
@@ -520,6 +624,7 @@ export const registerDocumentImage = async (
   }
 ) => {
   const document = await getDocumentData(userId, documentId);
+  assertCanEdit(getDocumentRole(userId, document));
   const expectedPrefix = `documents/${documentId}/`;
 
   if (!image.publicId.startsWith(expectedPrefix)) {

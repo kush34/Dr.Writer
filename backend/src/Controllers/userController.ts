@@ -2,7 +2,7 @@ import User from "../Models/userModel";
 import { saveOpenRouterKey } from "../service/openrouterAuth";
 import { z } from "zod";
 import { Request, Response, Router } from "express";
-import firebaseTokenVerify from "../Middlewares/firebaseTokenVerify";
+import { authenticatedRead, authenticatedSave } from "../Middlewares/rateLimits";
 import { getUserProfile, verifyFirebaseTokenAndEnsureUser } from "../Services/userService";
 import { handleControllerError } from "../utils/controllerErrorHandler";
 import { AppError } from "../utils/appError";
@@ -43,15 +43,15 @@ const getUserHandler = async (req: Request, res: Response) => {
 export const registerUserRoutes = (router: Router) => {
   router.get("/", healthCheck);
   router.post("/firebaseTokenVerify", firebaseTokenVerifyHandler);
-  router.get("/user", firebaseTokenVerify, getUserHandler);
-  router.get("/openrouter", firebaseTokenVerify, async (req, res) => {
+  router.get("/user", authenticatedRead, getUserHandler);
+  router.get("/openrouter", authenticatedRead, async (req, res) => {
     try {
       const user = await User.findById(requireAuthenticatedUser(req)).select("+openrouter_key");
       if (!user) throw new AppError(404, "User not found.");
       res.set("Cache-Control", "no-store").json({ connected: !!user.openrouter_key });
     } catch (error) { handleControllerError(res, error); }
   });
-  router.post("/openrouter", firebaseTokenVerify, async (req, res) => {
+  router.post("/openrouter", authenticatedSave, async (req, res) => {
     try {
       const { code, verifier } = z.object({ code: z.string().min(1).max(2048), verifier: z.string().regex(/^[A-Za-z0-9_-]{43,128}$/) }).strict().parse(req.body);
       const response = await fetch("https://openrouter.ai/api/v1/auth/keys", {
@@ -66,7 +66,7 @@ export const registerUserRoutes = (router: Router) => {
       res.set("Cache-Control", "no-store").json({ connected: true });
     } catch (error) { handleControllerError(res, error); }
   });
-  router.delete("/openrouter", firebaseTokenVerify, async (req, res) => {
+  router.delete("/openrouter", authenticatedSave, async (req, res) => {
     try {
       await User.updateOne({ _id: requireAuthenticatedUser(req) }, { $unset: { openrouter_key: 1 } });
       res.set("Cache-Control", "no-store").json({ connected: false });

@@ -1,0 +1,5 @@
+[
+  "src/hooks/use-throttled-callback.js:19:1 @typescript-eslint/no-explicit-any Definition for rule '@typescript-eslint/no-explicit-any' was not found.",
+  "src/hooks/use-toast.js:8:7 no-unused-vars 'actionTypes' is assigned a value but never used.",
+  "src/hooks/use-unmount.js:8:1 @typescript-eslint/no-explicit-any Definition for rule '@typescript-eslint/no-explicit-any' was not found."
+]
